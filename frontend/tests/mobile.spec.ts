@@ -1,6 +1,6 @@
 import { test, expect, type Page, type APIRequestContext } from '@playwright/test'
 
-const ROUTES = ['/', '/suggestions', '/recipes', '/grocery', '/review', '/analytics', '/admin']
+const ROUTES = ['/', '/suggestions', '/recipes', '/grocery', '/review', '/scan', '/analytics', '/admin']
 
 // Apple and Android both publish ~44px as the minimum comfortable touch target.
 const MIN_TOUCH = 44
@@ -77,12 +77,14 @@ test.describe('mobile layout', () => {
             const box = node.getBoundingClientRect()
             if (box.width === 0 || box.height === 0) return false
             if (node instanceof HTMLInputElement && node.type === 'hidden') return false
-            // Checkboxes and radios stay visually small, so a wrapping label provides
-            // the tap area. Other controls must meet the minimum themselves.
-            const isTick =
+            // Checkboxes, radios and file inputs are operated through a wrapping
+            // label (the file input is visually hidden entirely), so the label is
+            // the real tap area. Other controls must meet the minimum themselves —
+            // measuring every label would make Field-wrapped inputs pass vacuously.
+            const isProxied =
               node instanceof HTMLInputElement &&
-              (node.type === 'checkbox' || node.type === 'radio')
-            const label = isTick ? node.closest('label') : null
+              (node.type === 'checkbox' || node.type === 'radio' || node.type === 'file')
+            const label = isProxied ? node.closest('label') : null
             const hit = label ? label.getBoundingClientRect() : box
             return hit.height < min || hit.width < min
           })
@@ -101,7 +103,7 @@ test('every destination is reachable on a phone', async ({ page }) => {
   await settle(page, '/')
 
   // The four bottom-tab destinations must be tappable without opening a menu.
-  for (const name of ['Kitchen', 'Cook', 'Grocery', 'Stats']) {
+  for (const name of ['Kitchen', 'Cook', 'Scan', 'Grocery']) {
     await expect(page.locator('nav').last().getByRole('link', { name })).toBeVisible()
   }
 

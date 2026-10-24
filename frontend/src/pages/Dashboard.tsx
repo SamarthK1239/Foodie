@@ -22,11 +22,10 @@ import {
   PageHeader,
   Select,
 } from '../components/ui'
+import { LOCATIONS, UNITS } from '../lib/constants'
 import { ExpiryChip } from '../components/ExpiryChip'
 import { BUCKET_ORDER, BUCKET_STYLES, formatQuantity } from '../lib/format'
 
-const UNITS = ['unit', 'g', 'kg', 'ml', 'l', 'tbsp', 'tsp', 'cup', 'oz', 'lb', 'clove', 'package']
-const LOCATIONS = ['fridge', 'freezer', 'pantry', 'other']
 
 function AddItemForm({ onDone }: { onDone: () => void }) {
   const addItem = useAddItem()

@@ -14,6 +14,7 @@ import type {
   InventorySummary,
   Recipe,
   RecipeList,
+  ScanProduct,
   Suggestion,
   UnmatchedLine,
 } from './types'
@@ -332,5 +333,23 @@ export function useApplyPeriodReview() {
         { ingredient_ids: ingredientIds },
       ),
     onSuccess: () => invalidate(['grocery', 'analytics']),
+  })
+}
+
+// --- Barcode scanning ------------------------------------------------------------
+
+export function useLookupBarcode() {
+  return useMutation({
+    mutationFn: (barcode: string) =>
+      api.get<ScanProduct>(`/api/scan/barcode/${encodeURIComponent(barcode)}`),
+  })
+}
+
+export function useScanToInventory() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: (body: NewItem & { barcode: string }) =>
+      api.post<InventoryItem>('/api/scan/to-inventory', body),
+    onSuccess: () => invalidate(),
   })
 }

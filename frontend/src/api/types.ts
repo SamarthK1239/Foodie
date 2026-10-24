@@ -211,3 +211,17 @@ export interface PeriodReview {
   wasted: PeriodReviewWasted[]
   suggested: PeriodReviewSuggestion[]
 }
+
+export interface ScanProduct {
+  barcode: string
+  found: boolean
+  source: string
+  name: string | null
+  brand: string | null
+  quantity: number | null
+  unit: string | null
+  ingredient_id: number | null
+  ingredient_name: string | null
+  match_method: string
+  match_confidence: number
+}

@@ -11,8 +11,10 @@ import Review from './pages/Review'
 import Suggestions from './pages/Suggestions'
 import { Loading } from './components/ui'
 
-// Charting pulls in a large dependency that most page views never need.
+// Charting and barcode decoding each pull in a large dependency that most page
+// views never need, so they load only when their route is actually opened.
 const Analytics = lazy(() => import('./pages/Analytics'))
+const Scan = lazy(() => import('./pages/Scan'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,6 +34,14 @@ export default function App() {
             <Route path="recipes/:id" element={<RecipeDetail />} />
             <Route path="grocery" element={<Grocery />} />
             <Route path="review" element={<Review />} />
+            <Route
+              path="scan"
+              element={
+                <Suspense fallback={<Loading what="the scanner" />}>
+                  <Scan />
+                </Suspense>
+              }
+            />
             <Route
               path="analytics"
               element={

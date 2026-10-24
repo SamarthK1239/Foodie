@@ -231,7 +231,9 @@ def remember_product(
     if entry is None:
         entry = ProductLookup(barcode=barcode, name=name or barcode, source="manual")
         session.add(entry)
-    if name:
+    elif entry.source == "manual" and name:
+        # Keep whatever the product is actually called on the packaging; the typed
+        # value is the ingredient it counts as, not a better label for the product.
         entry.name = name[:255]
     if quantity is not None:
         entry.quantity = quantity

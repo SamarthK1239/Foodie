@@ -7,6 +7,7 @@ type NavItem = { to: string; label: string; end?: boolean }
 const LINKS: NavItem[] = [
   { to: '/', label: 'Dashboard', end: true },
   { to: '/suggestions', label: 'Cook' },
+  { to: '/scan', label: 'Scan' },
   { to: '/recipes', label: 'Recipes' },
   { to: '/grocery', label: 'Grocery' },
   { to: '/review', label: 'Review' },
@@ -14,18 +15,21 @@ const LINKS: NavItem[] = [
   { to: '/admin', label: 'Admin' },
 ]
 
-// The four destinations worth one-handed reach on a phone.
+// The four destinations worth one-handed reach on a phone. Scanning earns a slot
+// over Analytics: it is the thing you do standing up with shopping bags, whereas
+// charts are something you read sitting down on a bigger screen.
 const PRIMARY: NavItem[] = [
   { to: '/', label: 'Kitchen', end: true },
   { to: '/suggestions', label: 'Cook' },
+  { to: '/scan', label: 'Scan' },
   { to: '/grocery', label: 'Grocery' },
-  { to: '/analytics', label: 'Stats' },
 ]
 
 const ICONS: Record<string, string> = {
   '/': 'M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
   '/suggestions': 'M12 3a6 6 0 0 0-3 11.2V17a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-2.8A6 6 0 0 0 12 3zM10 20h4',
   '/grocery': 'M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.5a2 2 0 0 0 2-1.5L21 8H6M10 21h.01M17 21h.01',
+  '/scan': 'M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2M3 12h18',
   '/analytics': 'M4 20V10M10 20V4M16 20v-7M22 20H2',
 }
 

@@ -144,6 +144,8 @@ def test_adding_a_scan_to_inventory_remembers_what_the_barcode_was(client, off):
     assert again["source"] == "cache"
     assert again["match_method"] == "remembered"
     assert again["ingredient_id"] == item["ingredient"]["id"]
+    # The packaging name survives: it is what you recognise on the shelf.
+    assert again["name"] == "Own Brand Baked Beans"
     assert off.calls == []
 
 
