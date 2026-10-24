@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useLookupBarcode, useScanToInventory } from '../api/hooks'
+import { useLookupBarcode, useScanExpiry, useScanToInventory } from '../api/hooks'
 import type { ScanProduct } from '../api/types'
 import {
   Button,
@@ -97,6 +97,68 @@ function CameraPane({ onCode, onClose }: { onCode: (code: string) => void; onClo
       <Button variant="ghost" onClick={onClose}>
         Stop camera
       </Button>
+    </div>
+  )
+}
+
+function ExpiryPhoto({ onPick }: { onPick: (iso: string) => void }) {
+  const scanExpiry = useScanExpiry()
+  const result = scanExpiry.data
+
+  const onPhoto = (file: File | undefined) => {
+    if (!file) return
+    scanExpiry.mutate(file, {
+      // One confident reading is not worth a second tap, so apply it straight away.
+      onSuccess: (data) => {
+        if (data.candidates.length === 1) onPick(data.candidates[0].date)
+      },
+    })
+  }
+
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="inline-flex min-h-11 cursor-pointer items-center rounded-lg border border-white/15 px-3 text-sm text-white/80 hover:bg-white/5">
+          {scanExpiry.isPending ? 'Reading…' : 'Read expiry from a photo'}
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="sr-only"
+            onChange={(e) => onPhoto(e.target.files?.[0])}
+          />
+        </label>
+      </div>
+
+      {result && !result.available && (
+        <p className="mt-2 text-xs text-white/40">
+          Date reading is not installed on this server. Enter the date by hand.
+        </p>
+      )}
+      {result?.available && result.candidates.length === 0 && (
+        <p className="mt-2 text-xs text-amber-200/70">
+          No date found on that photo. Try filling the frame with the date, or type it in.
+        </p>
+      )}
+      {result?.available && result.candidates.length > 1 && (
+        <div className="mt-2">
+          {/* Printed dates are ambiguous often enough that guessing silently is worse
+              than asking, so every plausible reading is offered. */}
+          <p className="text-xs text-white/40">Which date is it?</p>
+          <div className="mt-1 flex flex-wrap gap-2">
+            {result.candidates.map((candidate) => (
+              <Button
+                key={candidate.date}
+                variant="secondary"
+                onClick={() => onPick(candidate.date)}
+              >
+                {candidate.date}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+      {scanExpiry.isError && <ErrorNote error={scanExpiry.error} />}
     </div>
   )
 }
@@ -299,6 +361,7 @@ export default function Scan() {
                 />
               </Field>
             </div>
+            <ExpiryPhoto onPick={(iso) => update('expiry_date', iso)} />
             {addItem.isError && <ErrorNote error={addItem.error} />}
             <div className="flex gap-2">
               <Button type="submit" disabled={addItem.isPending}>

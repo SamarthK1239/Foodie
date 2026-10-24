@@ -14,6 +14,8 @@ dependencies = [
     "recipe-scrapers>=15.0",
     "rapidfuzz>=3.10",
     "python-multipart>=0.0.12",
+    "pytesseract>=0.3.13",
+    "pillow>=11.0",
 ]
 
 [project.optional-dependencies]

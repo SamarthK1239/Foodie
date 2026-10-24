@@ -2,13 +2,20 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.api.inventory import create_item
 from app.db import get_session
-from app.schemas import InventoryItemOut, ScanProductOut, ScanToInventoryRequest
+from app.schemas import (
+    ExpiryCandidateOut,
+    ExpiryScanOut,
+    InventoryItemOut,
+    ScanProductOut,
+    ScanToInventoryRequest,
+)
 from app.services.barcode import lookup_barcode, remember_product
+from app.services.ocr import ocr_available, parse_expiry_candidates, read_text
 
 router = APIRouter(prefix="/api/scan", tags=["scan"])
 
@@ -39,3 +46,24 @@ def scan_to_inventory(
         unit=item.unit,
     )
     return item
+
+
+@router.post("/expiry", response_model=ExpiryScanOut)
+async def scan_expiry(image: UploadFile = File(...)) -> ExpiryScanOut:
+    """Read candidate expiry dates off a photo of a label.
+
+    Returns available=false rather than an error when Tesseract is missing, so the
+    UI can quietly fall back to the date picker instead of showing a failure.
+    """
+    if not ocr_available():
+        return ExpiryScanOut(available=False)
+
+    text = read_text(await image.read())
+    return ExpiryScanOut(
+        available=True,
+        text=text.strip()[:2000],
+        candidates=[
+            ExpiryCandidateOut(date=c.value, hinted=c.hinted, text=c.source)
+            for c in parse_expiry_candidates(text)[:5]
+        ],
+    )

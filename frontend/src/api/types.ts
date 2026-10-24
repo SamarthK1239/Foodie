@@ -225,3 +225,9 @@ export interface ScanProduct {
   match_method: string
   match_confidence: number
 }
+
+export interface ExpiryScan {
+  available: boolean
+  candidates: { date: string; hinted: boolean; text: string }[]
+  text: string
+}

@@ -342,3 +342,15 @@ class ScanProductOut(BaseModel):
 
 class ScanToInventoryRequest(InventoryItemCreate):
     barcode: str = Field(min_length=1, max_length=32)
+
+
+class ExpiryCandidateOut(BaseModel):
+    date: date
+    hinted: bool
+    text: str
+
+
+class ExpiryScanOut(BaseModel):
+    available: bool
+    candidates: list[ExpiryCandidateOut] = []
+    text: str = ""

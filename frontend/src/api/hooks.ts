@@ -5,6 +5,7 @@ import type {
   AnalyticsSummary,
   CookEvent,
   CookResult,
+  ExpiryScan,
   GroceryItem,
   GroceryStatus,
   IngestStatusResponse,
@@ -351,5 +352,19 @@ export function useScanToInventory() {
     mutationFn: (body: NewItem & { barcode: string }) =>
       api.post<InventoryItem>('/api/scan/to-inventory', body),
     onSuccess: () => invalidate(),
+  })
+}
+
+export function useScanExpiry() {
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const body = new FormData()
+      body.append('image', file)
+      // FormData must set its own multipart boundary, so this one bypasses the
+      // JSON client rather than fighting its Content-Type header.
+      const response = await fetch('/api/scan/expiry', { method: 'POST', body })
+      if (!response.ok) throw new Error('Could not read that photo')
+      return (await response.json()) as ExpiryScan
+    },
   })
 }
