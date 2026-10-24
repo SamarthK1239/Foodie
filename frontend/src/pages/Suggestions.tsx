@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useCook, useExpiring, useSuggestions } from '../api/hooks'
+import { useCook, useExpiring, useSetLeftoverState, useSuggestions } from '../api/hooks'
 import type { CookResult, Match, Suggestion } from '../api/types'
 import { Button, Card, EmptyState, ErrorNote, Loading, PageHeader, Select } from '../components/ui'
 import { ExpiryChip } from '../components/ExpiryChip'
@@ -28,6 +28,15 @@ function MatchPill({ match, missing }: { match: Match; missing?: boolean }) {
 }
 
 function CookSummary({ result, onClose }: { result: CookResult; onClose: () => void }) {
+  const setLeftover = useSetLeftoverState()
+  const [answered, setAnswered] = useState<'in_fridge' | 'finished' | null>(null)
+
+  const answer = (state: 'in_fridge' | 'finished') =>
+    setLeftover.mutate(
+      { id: result.cook_event_id, state },
+      { onSuccess: () => setAnswered(state) },
+    )
+
   return (
     <Card className="mb-6 border-emerald-500/30 bg-emerald-500/5">
       <div className="flex items-start justify-between gap-4">
@@ -50,6 +59,35 @@ function CookSummary({ result, onClose }: { result: CookResult; onClose: () => v
         <Button variant="ghost" onClick={onClose}>
           Dismiss
         </Button>
+      </div>
+
+      {/* Asked now, while it is still obvious. Chasing it up later never works. */}
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
+        {answered === null ? (
+          <>
+            <span className="text-sm text-white/60">Any leftovers?</span>
+            <Button
+              variant="secondary"
+              disabled={setLeftover.isPending}
+              onClick={() => answer('in_fridge')}
+            >
+              Yes, in the fridge
+            </Button>
+            <Button
+              variant="ghost"
+              disabled={setLeftover.isPending}
+              onClick={() => answer('finished')}
+            >
+              No, all eaten
+            </Button>
+          </>
+        ) : (
+          <span className="text-sm text-white/60">
+            {answered === 'in_fridge'
+              ? 'Noted — leftovers in the fridge. Mark them eaten from Analytics.'
+              : 'Noted — nothing left over.'}
+          </span>
+        )}
       </div>
     </Card>
   )
