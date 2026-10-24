@@ -322,3 +322,23 @@ class PeriodReviewOut(BaseModel):
 
 class ApplyPeriodReviewRequest(BaseModel):
     ingredient_ids: list[int]
+
+
+class ScanProductOut(BaseModel):
+    """What a barcode scan worked out. `found` false means: fall back to manual entry."""
+
+    barcode: str
+    found: bool
+    source: str
+    name: str | None = None
+    brand: str | None = None
+    quantity: float | None = None
+    unit: str | None = None
+    ingredient_id: int | None = None
+    ingredient_name: str | None = None
+    match_method: str = "unmatched"
+    match_confidence: float = 0.0
+
+
+class ScanToInventoryRequest(InventoryItemCreate):
+    barcode: str = Field(min_length=1, max_length=32)

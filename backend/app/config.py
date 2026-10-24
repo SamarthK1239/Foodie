@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     expiry_critical_days: int = 2
     expiry_soon_days: int = 5
 
+    # Barcode scanning
+    openfoodfacts_url: str = "https://world.openfoodfacts.org"
+    barcode_lookup_enabled: bool = True
+    barcode_timeout_seconds: float = 8.0
+
     # Phase 3 placeholders
     llm_base_url: str = "http://localhost:8080/v1"
     llm_model: str = "qwen3"

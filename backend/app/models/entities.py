@@ -214,5 +214,23 @@ class IngestJob(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
+class ProductLookup(Base):
+    """Cache of barcode lookups so a rescanned product never re-hits the network."""
+
+    __tablename__ = "product_lookup"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    barcode: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(255))
+    brand: Mapped[str | None] = mapped_column(String(255))
+    quantity: Mapped[float | None] = mapped_column(Float)
+    unit: Mapped[str | None] = mapped_column(String(32))
+    source: Mapped[str] = mapped_column(String(32), default="openfoodfacts")
+    ingredient_id: Mapped[int | None] = mapped_column(ForeignKey("ingredient.id"), index=True)
+    raw: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+
 Index("ix_inventory_item_status_expiry", InventoryItem.status, InventoryItem.expiry_date)
 Index("ix_recipe_ingredient_ing_recipe", RecipeIngredient.ingredient_id, RecipeIngredient.recipe_id)

@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.api import admin, analytics, grocery, inventory, recipes, suggestions
+from app.api import admin, analytics, grocery, inventory, recipes, scan, suggestions
 from app.config import settings
 from app.db import SessionLocal
 from app.ingest import runner
@@ -68,6 +68,7 @@ def create_app() -> FastAPI:
     app.include_router(suggestions.router)
     app.include_router(grocery.router)
     app.include_router(analytics.router)
+    app.include_router(scan.router)
     app.include_router(admin.router)
 
     @app.get("/api/health")
