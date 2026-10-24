@@ -1,0 +1,314 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { api, qs } from './client'
+import type {
+  AdminStats,
+  AnalyticsSummary,
+  CookEvent,
+  CookResult,
+  GroceryItem,
+  GroceryStatus,
+  IngestStatusResponse,
+  Ingredient,
+  InventoryItem,
+  InventorySummary,
+  Recipe,
+  RecipeList,
+  Suggestion,
+  UnmatchedLine,
+} from './types'
+
+// Anything that can change when stock moves; refreshed together after a mutation.
+const STOCK_DEPENDENT = ['inventory', 'inventory-summary', 'suggestions', 'grocery', 'analytics']
+
+function useInvalidate() {
+  const queryClient = useQueryClient()
+  return (keys: string[] = STOCK_DEPENDENT) => {
+    for (const key of keys) queryClient.invalidateQueries({ queryKey: [key] })
+  }
+}
+
+// --- Inventory -------------------------------------------------------------------
+
+export function useInventory(params: { status?: string; search?: string; bucket?: string } = {}) {
+  return useQuery({
+    queryKey: ['inventory', params],
+    queryFn: () => api.get<InventoryItem[]>(`/api/inventory/items${qs(params)}`),
+  })
+}
+
+export function useInventorySummary() {
+  return useQuery({
+    queryKey: ['inventory-summary'],
+    queryFn: () => api.get<InventorySummary>('/api/inventory/summary'),
+  })
+}
+
+export function useExpiring(withinDays = 5) {
+  return useQuery({
+    queryKey: ['inventory', 'expiring', withinDays],
+    queryFn: () => api.get<InventoryItem[]>(`/api/inventory/expiring${qs({ within_days: withinDays })}`),
+  })
+}
+
+export interface NewItem {
+  ingredient_name: string
+  quantity: number
+  unit: string
+  expiry_date?: string
+  purchase_date?: string
+  location?: string
+  cost?: number
+  notes?: string
+}
+
+export function useAddItem() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: (item: NewItem) => api.post<InventoryItem>('/api/inventory/items', item),
+    onSuccess: () => invalidate(),
+  })
+}
+
+export function useUpdateItem() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: ({ id, ...patch }: { id: number } & Partial<InventoryItem>) =>
+      api.patch<InventoryItem>(`/api/inventory/items/${id}`, patch),
+    onSuccess: () => invalidate(),
+  })
+}
+
+export function useAdjustItem() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: ({ id, delta, reason }: { id: number; delta: number; reason?: string }) =>
+      api.post<InventoryItem>(`/api/inventory/items/${id}/adjust`, { delta, reason: reason ?? 'manual_adjust' }),
+    onSuccess: () => invalidate(),
+  })
+}
+
+export function useItemAction(action: 'discard' | 'finish') {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: (id: number) => api.post<InventoryItem>(`/api/inventory/items/${id}/${action}`),
+    onSuccess: () => invalidate(),
+  })
+}
+
+export function useDeleteItem() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: (id: number) => api.delete<void>(`/api/inventory/items/${id}`),
+    onSuccess: () => invalidate(),
+  })
+}
+
+export function useIngredients(search = '') {
+  return useQuery({
+    queryKey: ['ingredients', search],
+    queryFn: () => api.get<Ingredient[]>(`/api/ingredients${qs({ search })}`),
+  })
+}
+
+export function useUpdateIngredient() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: ({ id, ...patch }: { id: number } & Partial<Ingredient>) =>
+      api.patch<Ingredient>(`/api/ingredients/${id}`, patch),
+    onSuccess: () => invalidate(['ingredients', ...STOCK_DEPENDENT]),
+  })
+}
+
+// --- Recipes ---------------------------------------------------------------------
+
+export function useRecipes(params: { search?: string; limit?: number; offset?: number } = {}) {
+  return useQuery({
+    queryKey: ['recipes', params],
+    queryFn: () => api.get<RecipeList>(`/api/recipes${qs(params)}`),
+  })
+}
+
+export function useRecipe(id: number | undefined) {
+  return useQuery({
+    queryKey: ['recipe', id],
+    queryFn: () => api.get<Recipe>(`/api/recipes/${id}`),
+    enabled: id !== undefined,
+  })
+}
+
+export interface RecipeInput {
+  title: string
+  instructions: string
+  servings?: number | null
+  total_minutes?: number | null
+  tags: string[]
+  ingredients: { raw_text: string; optional: boolean }[]
+}
+
+export function useSaveRecipe(id?: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (recipe: RecipeInput) =>
+      id === undefined
+        ? api.post<Recipe>('/api/recipes', recipe)
+        : api.patch<Recipe>(`/api/recipes/${id}`, recipe),
+    onSuccess: (saved) => {
+      queryClient.invalidateQueries({ queryKey: ['recipes'] })
+      queryClient.invalidateQueries({ queryKey: ['recipe', saved.id] })
+      queryClient.invalidateQueries({ queryKey: ['suggestions'] })
+    },
+  })
+}
+
+export function useDeleteRecipe() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api.delete<void>(`/api/recipes/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recipes'] })
+      queryClient.invalidateQueries({ queryKey: ['suggestions'] })
+    },
+  })
+}
+
+// --- Suggestions & cooking -------------------------------------------------------
+
+export function useSuggestions(params: { limit?: number; offset?: number; min_coverage?: number } = {}) {
+  return useQuery({
+    queryKey: ['suggestions', params],
+    queryFn: () => api.get<Suggestion[]>(`/api/suggestions${qs(params)}`),
+  })
+}
+
+export function useCook() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: ({ id, multiplier }: { id: number; multiplier?: number }) =>
+      api.post<CookResult>(`/api/recipes/${id}/cook`, { servings_multiplier: multiplier ?? 1 }),
+    onSuccess: () => invalidate([...STOCK_DEPENDENT, 'cook-events']),
+  })
+}
+
+export function useCookEvents() {
+  return useQuery({
+    queryKey: ['cook-events'],
+    queryFn: () => api.get<CookEvent[]>('/api/cook-events'),
+  })
+}
+
+export function useSetLeftoverState() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: ({ id, state }: { id: number; state: 'in_fridge' | 'finished' }) =>
+      api.patch<CookEvent>(`/api/cook-events/${id}`, { leftover_state: state }),
+    onSuccess: () => invalidate(['cook-events']),
+  })
+}
+
+// --- Grocery ---------------------------------------------------------------------
+
+export function useGrocery(status: GroceryStatus = 'pending') {
+  return useQuery({
+    queryKey: ['grocery', status],
+    queryFn: () => api.get<GroceryItem[]>(`/api/grocery${qs({ status })}`),
+  })
+}
+
+export function useAddGrocery() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: (item: { ingredient_name: string; quantity?: number; unit?: string }) =>
+      api.post<GroceryItem>('/api/grocery', item),
+    onSuccess: () => invalidate(['grocery']),
+  })
+}
+
+export function useUpdateGrocery() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: ({ id, ...patch }: { id: number } & Partial<GroceryItem>) =>
+      api.patch<GroceryItem>(`/api/grocery/${id}`, patch),
+    onSuccess: () => invalidate(['grocery']),
+  })
+}
+
+export function useDeleteGrocery() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: (id: number) => api.delete<void>(`/api/grocery/${id}`),
+    onSuccess: () => invalidate(['grocery']),
+  })
+}
+
+export function useClearPurchased() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: () => api.post<void>('/api/grocery/clear-purchased'),
+    onSuccess: () => invalidate(['grocery']),
+  })
+}
+
+// --- Analytics & admin -----------------------------------------------------------
+
+export function useAnalyticsSummary(days = 30) {
+  return useQuery({
+    queryKey: ['analytics', 'summary', days],
+    queryFn: () => api.get<AnalyticsSummary>(`/api/analytics/summary${qs({ days })}`),
+  })
+}
+
+export function useAnalyticsSeries<T>(endpoint: string, days: number) {
+  return useQuery({
+    queryKey: ['analytics', endpoint, days],
+    queryFn: () => api.get<T[]>(`/api/analytics/${endpoint}${qs({ days })}`),
+  })
+}
+
+export function useAdminStats() {
+  return useQuery({ queryKey: ['admin-stats'], queryFn: () => api.get<AdminStats>('/api/admin/stats') })
+}
+
+export function useIngestStatus(poll: boolean) {
+  return useQuery({
+    queryKey: ['ingest-status'],
+    queryFn: () => api.get<IngestStatusResponse>('/api/admin/ingest/status'),
+    refetchInterval: poll ? 3000 : false,
+  })
+}
+
+export function useStartIngest() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { mode: string; max_recipes?: number; sites?: string[] }) =>
+      api.post('/api/admin/ingest/start', body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ingest-status'] }),
+  })
+}
+
+export function useCancelIngest() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.post('/api/admin/ingest/cancel'),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ingest-status'] }),
+  })
+}
+
+export function useUnmatched() {
+  return useQuery({
+    queryKey: ['unmatched'],
+    queryFn: () => api.get<UnmatchedLine[]>('/api/admin/unmatched-ingredients'),
+  })
+}
+
+export function useResolveUnmatched() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { recipe_ingredient_id: number; ingredient_name: string }) =>
+      api.post('/api/admin/unmatched-ingredients/resolve', body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['unmatched'] })
+      queryClient.invalidateQueries({ queryKey: ['admin-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['suggestions'] })
+    },
+  })
+}

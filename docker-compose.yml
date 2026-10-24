@@ -1,0 +1,32 @@
+services:
+  foodie:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: foodie:latest
+    container_name: foodie
+    restart: unless-stopped
+    ports:
+      # Host port is configurable because 8000 is a common collision; override with
+      # FOODIE_HOST_PORT=8081 in a .env file or the environment.
+      # Bind to the Tailscale interface only if you have one; 0.0.0.0 exposes
+      # the app to your whole LAN and there is no authentication.
+      - "${FOODIE_HOST_PORT:-8000}:8000"
+    volumes:
+      # Drop an existing foodie.db in here and it will be picked up on start.
+      - foodie-data:/data
+    environment:
+      FOODIE_DATA_DIR: /data
+      FOODIE_SEED_ON_FIRST_RUN: "true"
+      FOODIE_SCRAPE_MAX_RECIPES: "300"
+      FOODIE_SCRAPE_RESPECT_ROBOTS: "true"
+      FOODIE_SCRAPE_DELAY_SECONDS: "1.5"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+volumes:
+  foodie-data:
