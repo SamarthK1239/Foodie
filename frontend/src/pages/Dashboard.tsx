@@ -189,7 +189,11 @@ function ItemRow({ item }: { item: InventoryItem }) {
           </Button>
         </div>
       ) : (
-        <button onClick={() => setEditing(true)} title="Edit expiry date">
+        <button
+          onClick={() => setEditing(true)}
+          title="Edit expiry date"
+          className="inline-flex min-h-11 items-center md:min-h-0"
+        >
           <ExpiryChip bucket={item.expiry_bucket} daysLeft={item.days_left} />
         </button>
       )}

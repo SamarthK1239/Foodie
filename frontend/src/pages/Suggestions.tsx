@@ -130,7 +130,7 @@ function SuggestionCard({
         </Button>
         <Link
           to={`/recipes/${suggestion.recipe.id}`}
-          className="rounded-lg px-3 py-1.5 text-sm font-medium text-white/60 transition hover:bg-white/10 hover:text-white"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg px-3 py-2 text-sm font-medium text-white/60 transition hover:bg-white/10 hover:text-white md:min-h-0 md:py-1.5"
         >
           View recipe
         </Link>

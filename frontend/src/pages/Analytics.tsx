@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react'
 import {
   Bar,
   BarChart,
@@ -83,7 +84,26 @@ function money(value: number) {
   return `£${value.toFixed(2)}`
 }
 
+// Category labels on vertical bar charts must not eat a third of a phone screen.
+const NARROW_QUERY = '(max-width: 640px)'
+
+function useNarrowViewport() {
+  return useSyncExternalStore(
+    (onChange) => {
+      const media = window.matchMedia(NARROW_QUERY)
+      media.addEventListener('change', onChange)
+      return () => media.removeEventListener('change', onChange)
+    },
+    () => window.matchMedia(NARROW_QUERY).matches,
+    () => false,
+  )
+}
+
 export default function Analytics() {
+  const narrow = useNarrowViewport()
+  const labelWidth = narrow ? 72 : 110
+  const truncateLabel = (value: string) =>
+    narrow && value.length > 11 ? `${value.slice(0, 10)}…` : value
   const days = 28
   const { data: summary, isLoading, error } = useAnalyticsSummary(days)
   const { data: overTime } = useAnalyticsSeries<PeriodRow>('spend-over-time', days)
@@ -162,7 +182,13 @@ export default function Analytics() {
           <BarChart data={mostWasted ?? []} layout="vertical">
             <CartesianGrid stroke="#ffffff10" horizontal={false} />
             <XAxis type="number" {...AXIS} allowDecimals={false} />
-            <YAxis type="category" dataKey="name" width={110} {...AXIS} />
+            <YAxis
+              type="category"
+              dataKey="name"
+              width={labelWidth}
+              tickFormatter={truncateLabel}
+              {...AXIS}
+            />
             <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#ffffff08' }} />
             <Bar dataKey="times" fill="#f87171" radius={[0, 4, 4, 0]} />
           </BarChart>
@@ -172,7 +198,13 @@ export default function Analytics() {
           <BarChart data={mostUsed ?? []} layout="vertical">
             <CartesianGrid stroke="#ffffff10" horizontal={false} />
             <XAxis type="number" {...AXIS} allowDecimals={false} />
-            <YAxis type="category" dataKey="name" width={110} {...AXIS} />
+            <YAxis
+              type="category"
+              dataKey="name"
+              width={labelWidth}
+              tickFormatter={truncateLabel}
+              {...AXIS}
+            />
             <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#ffffff08' }} />
             <Bar dataKey="times" fill="#34d399" radius={[0, 4, 4, 0]} />
           </BarChart>

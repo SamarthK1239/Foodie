@@ -20,6 +20,11 @@ data/
 .cache/
 http_cache/
 
+# E2E test artifacts
+.playwright-data/
+frontend/test-results/
+frontend/playwright-report/
+
 # Env
 .env
 .env.local

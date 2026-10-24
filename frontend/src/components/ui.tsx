@@ -64,7 +64,7 @@ export function Button({
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`rounded-lg px-3 py-1.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${BUTTON_VARIANTS[variant]} ${className}`}
+      className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 md:min-h-0 md:min-w-0 md:py-1.5 ${BUTTON_VARIANTS[variant]} ${className}`}
     >
       {children}
     </button>
@@ -75,7 +75,7 @@ export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className={`w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-emerald-500/60 ${props.className ?? ''}`}
+      className={`min-h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-emerald-500/60 md:min-h-0 ${props.className ?? ''}`}
     />
   )
 }
@@ -84,7 +84,7 @@ export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
       {...props}
-      className={`w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-emerald-500/60 ${props.className ?? ''}`}
+      className={`min-h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-emerald-500/60 md:min-h-0 ${props.className ?? ''}`}
     />
   )
 }

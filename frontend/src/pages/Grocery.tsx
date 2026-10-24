@@ -85,13 +85,15 @@ export default function Grocery() {
               key={item.id}
               className="flex items-center gap-3 border-b border-white/5 py-3 last:border-0"
             >
-              <input
-                type="checkbox"
-                checked={false}
-                title="Mark as purchased"
-                className="h-4 w-4 accent-emerald-500"
-                onChange={() => update.mutate({ id: item.id, status: 'purchased' })}
-              />
+              <label className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center md:min-h-0 md:min-w-0">
+                <input
+                  type="checkbox"
+                  checked={false}
+                  title="Mark as purchased"
+                  className="h-5 w-5 accent-emerald-500 md:h-4 md:w-4"
+                  onChange={() => update.mutate({ id: item.id, status: 'purchased' })}
+                />
+              </label>
               <div className="flex-1">
                 <p className="text-sm font-medium text-white">
                   {item.label}
