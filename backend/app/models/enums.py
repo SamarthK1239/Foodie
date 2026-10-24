@@ -27,6 +27,7 @@ class GrocerySource(enum.StrEnum):
     AUTO_DEPLETED = "auto_depleted"
     MANUAL = "manual"
     RECIPE_GAP = "recipe_gap"
+    PERIOD_REVIEW = "period_review"
 
 
 class GroceryStatus(enum.StrEnum):

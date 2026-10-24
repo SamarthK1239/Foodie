@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard'
 import Grocery from './pages/Grocery'
 import RecipeDetail from './pages/RecipeDetail'
 import Recipes from './pages/Recipes'
+import Review from './pages/Review'
 import Suggestions from './pages/Suggestions'
 import { Loading } from './components/ui'
 
@@ -30,6 +31,7 @@ export default function App() {
             <Route path="recipes" element={<Recipes />} />
             <Route path="recipes/:id" element={<RecipeDetail />} />
             <Route path="grocery" element={<Grocery />} />
+            <Route path="review" element={<Review />} />
             <Route
               path="analytics"
               element={

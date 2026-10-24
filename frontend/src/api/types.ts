@@ -2,7 +2,7 @@ export type ExpiryBucket = 'expired' | 'critical' | 'soon' | 'ok' | 'none'
 export type ItemStatus = 'active' | 'consumed' | 'discarded'
 export type StorageLocation = 'fridge' | 'freezer' | 'pantry' | 'other'
 export type GroceryStatus = 'pending' | 'purchased' | 'dismissed'
-export type GrocerySource = 'auto_depleted' | 'manual' | 'recipe_gap'
+export type GrocerySource = 'auto_depleted' | 'manual' | 'recipe_gap' | 'period_review'
 
 export interface Ingredient {
   id: number
@@ -165,4 +165,49 @@ export interface CookEvent {
   leftover_state: 'in_fridge' | 'finished' | null
   cooked_at: string
   note: string | null
+}
+
+export interface PeriodReviewUsed {
+  ingredient_id: number
+  name: string
+  times: number
+  quantity: number
+}
+
+export interface PeriodReviewUnused {
+  ingredient_id: number
+  item_id: number
+  name: string
+  quantity: number
+  unit: string | null
+  days_in_stock: number
+  expiry_bucket: ExpiryBucket
+}
+
+export interface PeriodReviewWasted {
+  ingredient_id: number
+  name: string
+  times: number
+  cost: number
+}
+
+export interface PeriodReviewSuggestion {
+  ingredient_id: number
+  name: string
+  times_used: number
+  remaining: number
+  unit: string | null
+  reason: 'out_of_stock' | 'low_stock'
+  already_on_list: boolean
+}
+
+export interface PeriodReview {
+  weeks: number
+  period_days: number
+  start: string
+  end: string
+  used: PeriodReviewUsed[]
+  unused: PeriodReviewUnused[]
+  wasted: PeriodReviewWasted[]
+  suggested: PeriodReviewSuggestion[]
 }

@@ -9,6 +9,7 @@ import type {
   GroceryStatus,
   IngestStatusResponse,
   Ingredient,
+  PeriodReview,
   InventoryItem,
   InventorySummary,
   Recipe,
@@ -310,5 +311,26 @@ export function useResolveUnmatched() {
       queryClient.invalidateQueries({ queryKey: ['admin-stats'] })
       queryClient.invalidateQueries({ queryKey: ['suggestions'] })
     },
+  })
+}
+
+// --- Two-week review -------------------------------------------------------------
+
+export function usePeriodReview(weeks: number) {
+  return useQuery({
+    queryKey: ['analytics', 'period-review', weeks],
+    queryFn: () => api.get<PeriodReview>(`/api/analytics/period-review${qs({ weeks })}`),
+  })
+}
+
+export function useApplyPeriodReview() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: (ingredientIds: number[]) =>
+      api.post<{ added: number; grocery_item_ids: number[] }>(
+        '/api/analytics/period-review/apply',
+        { ingredient_ids: ingredientIds },
+      ),
+    onSuccess: () => invalidate(['grocery', 'analytics']),
   })
 }

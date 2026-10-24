@@ -1,6 +1,6 @@
 import { test, expect, type Page, type APIRequestContext } from '@playwright/test'
 
-const ROUTES = ['/', '/suggestions', '/recipes', '/grocery', '/analytics', '/admin']
+const ROUTES = ['/', '/suggestions', '/recipes', '/grocery', '/review', '/analytics', '/admin']
 
 // Apple and Android both publish ~44px as the minimum comfortable touch target.
 const MIN_TOUCH = 44
@@ -107,7 +107,7 @@ test('every destination is reachable on a phone', async ({ page }) => {
 
   // Everything else has to be reachable through the menu.
   await page.getByRole('button', { name: 'Menu' }).click()
-  for (const name of ['Dashboard', 'Recipes', 'Analytics', 'Admin']) {
+  for (const name of ['Dashboard', 'Recipes', 'Review', 'Analytics', 'Admin']) {
     await expect(page.getByRole('link', { name, exact: true })).toBeVisible()
   }
 
@@ -125,7 +125,7 @@ test('desktop keeps the inline nav and hides the mobile chrome', async ({ browse
   await expect(page.locator('main')).toBeVisible()
 
   // All six links sit inline in the header, so no menu button is needed.
-  for (const name of ['Dashboard', 'Cook', 'Recipes', 'Grocery', 'Analytics', 'Admin']) {
+  for (const name of ['Dashboard', 'Cook', 'Recipes', 'Grocery', 'Review', 'Analytics', 'Admin']) {
     await expect(page.locator('header').getByRole('link', { name, exact: true })).toBeVisible()
   }
   await expect(page.getByRole('button', { name: 'Menu' })).toBeHidden()

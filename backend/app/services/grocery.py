@@ -26,6 +26,11 @@ def _existing_pending(session: Session, ingredient_id: int) -> GroceryItem | Non
     return session.execute(stmt).scalars().first()
 
 
+def pending_entry(session: Session, ingredient_id: int) -> GroceryItem | None:
+    """Public read-only view of whether an ingredient is already on the list."""
+    return _existing_pending(session, ingredient_id)
+
+
 def remaining_quantity(session: Session, ingredient_id: int, unit: str | None) -> float:
     """Total active stock of an ingredient, expressed in `unit` where possible."""
     stmt = select(InventoryItem).where(

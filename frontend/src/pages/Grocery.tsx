@@ -14,6 +14,7 @@ const SOURCE_LABELS: Record<GrocerySource, string> = {
   auto_depleted: 'Ran out',
   recipe_gap: 'Recipe needed it',
   manual: 'Added by you',
+  period_review: 'From your review',
 }
 
 export default function Grocery() {

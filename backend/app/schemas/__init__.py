@@ -307,3 +307,18 @@ class SummaryOut(BaseModel):
     active_items: int
     expiring_soon: int
     dishes_cooked: int
+
+
+class PeriodReviewOut(BaseModel):
+    weeks: int
+    period_days: int
+    start: str
+    end: str
+    used: list[dict]
+    unused: list[dict]
+    wasted: list[dict]
+    suggested: list[dict]
+
+
+class ApplyPeriodReviewRequest(BaseModel):
+    ingredient_ids: list[int]

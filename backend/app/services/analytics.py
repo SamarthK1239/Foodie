@@ -17,7 +17,7 @@ from app.models import (
     ItemStatus,
     TransactionReason,
 )
-from app.services.inventory import active_items, expiry_bucket
+from app.services.inventory import EPSILON, active_items, expiry_bucket
 
 
 def _window_start(days: int) -> datetime:
@@ -192,3 +192,188 @@ def recent_cooks(session: Session, days: int = 28, limit: int = 50) -> list[dict
         }
         for e in session.execute(stmt).scalars()
     ]
+
+
+# --- Two-week period review ------------------------------------------------------
+
+
+@dataclass
+class PeriodReview:
+    weeks: int
+    period_days: int
+    start: str
+    end: str
+    used: list[dict]
+    unused: list[dict]
+    wasted: list[dict]
+    suggested: list[dict]
+
+
+def _used_in_window(session: Session, start: datetime) -> list[dict]:
+    """Ingredients actually cooked with during the window, most-used first."""
+    stmt = (
+        select(
+            Ingredient.id.label("ingredient_id"),
+            Ingredient.display_name.label("name"),
+            func.count().label("times"),
+            func.coalesce(func.sum(-InventoryTransaction.delta_qty), 0.0).label("quantity"),
+        )
+        .select_from(InventoryTransaction)
+        .join(Ingredient, Ingredient.id == InventoryTransaction.ingredient_id)
+        .where(
+            InventoryTransaction.reason == TransactionReason.COOK,
+            InventoryTransaction.created_at >= start,
+        )
+        .group_by(Ingredient.id)
+        .order_by(func.count().desc(), Ingredient.display_name)
+    )
+    return [
+        {
+            "ingredient_id": row.ingredient_id,
+            "name": row.name,
+            "times": row.times,
+            "quantity": round(float(row.quantity), 2),
+        }
+        for row in session.execute(stmt)
+    ]
+
+
+def _wasted_in_window(session: Session, start: datetime) -> list[dict]:
+    stmt = (
+        select(
+            Ingredient.id.label("ingredient_id"),
+            Ingredient.display_name.label("name"),
+            func.count().label("times"),
+            func.coalesce(func.sum(InventoryItem.cost), 0.0).label("cost"),
+        )
+        .select_from(InventoryItem)
+        .join(Ingredient, Ingredient.id == InventoryItem.ingredient_id)
+        .where(
+            InventoryItem.status == ItemStatus.DISCARDED,
+            InventoryItem.updated_at >= start,
+        )
+        .group_by(Ingredient.id)
+        .order_by(func.count().desc(), Ingredient.display_name)
+    )
+    return [
+        {
+            "ingredient_id": row.ingredient_id,
+            "name": row.name,
+            "times": row.times,
+            "cost": round(float(row.cost), 2),
+        }
+        for row in session.execute(stmt)
+    ]
+
+
+def _unused_in_window(session: Session, start: datetime) -> list[dict]:
+    """Stock that was already in the kitchen when the period began and never got touched.
+
+    These are the items quietly heading for the bin, so they are the ones worth
+    cooking next rather than buying again.
+    """
+    touched = select(InventoryTransaction.ingredient_id).where(
+        InventoryTransaction.created_at >= start,
+        InventoryTransaction.reason.in_((TransactionReason.COOK, TransactionReason.WASTE)),
+    )
+    stmt = (
+        select(InventoryItem)
+        .where(
+            InventoryItem.status == ItemStatus.ACTIVE,
+            InventoryItem.created_at < start,
+            InventoryItem.ingredient_id.not_in(touched),
+        )
+        .order_by(InventoryItem.expiry_date.is_(None), InventoryItem.expiry_date)
+    )
+    now = datetime.now(UTC).replace(tzinfo=None)
+    return [
+        {
+            "ingredient_id": item.ingredient_id,
+            "item_id": item.id,
+            "name": item.ingredient.display_name,
+            "quantity": round(float(item.quantity), 2),
+            "unit": item.unit,
+            "days_in_stock": max((now - item.created_at).days, 0),
+            "expiry_bucket": expiry_bucket(item.expiry_date),
+        }
+        for item in session.execute(stmt).unique().scalars()
+    ]
+
+
+def _suggested_restock(
+    session: Session, used: list[dict], wasted: list[dict]
+) -> list[dict]:
+    """What to buy again: things cooked with this period that have now run out.
+
+    Anything binned during the same period is deliberately left off. If it went
+    in the bin, buying more of it is how the waste repeats.
+    """
+    from app.services import grocery as grocery_service
+
+    wasted_ids = {row["ingredient_id"] for row in wasted}
+    suggestions = []
+    for row in used:
+        if row["ingredient_id"] in wasted_ids:
+            continue
+        ingredient = session.get(Ingredient, row["ingredient_id"])
+        if ingredient is None:
+            continue
+        unit = ingredient.restock_unit or ingredient.default_unit
+        remaining = grocery_service.remaining_quantity(session, ingredient.id, unit)
+        threshold = ingredient.restock_threshold or 0.0
+        if remaining > max(threshold, EPSILON):
+            continue
+        # Running out usually auto-adds the item already; say so rather than
+        # implying the review found something new.
+        already_listed = grocery_service.pending_entry(session, ingredient.id) is not None
+        suggestions.append(
+            {
+                "ingredient_id": ingredient.id,
+                "name": ingredient.display_name,
+                "times_used": row["times"],
+                "remaining": round(float(remaining), 2),
+                "unit": unit,
+                "reason": "out_of_stock" if remaining <= EPSILON else "low_stock",
+                "already_on_list": already_listed,
+            }
+        )
+    return suggestions
+
+
+def period_review(session: Session, weeks: int = 2) -> PeriodReview:
+    days = weeks * 7
+    start = _window_start(days)
+    used = _used_in_window(session, start)
+    wasted = _wasted_in_window(session, start)
+    return PeriodReview(
+        weeks=weeks,
+        period_days=days,
+        start=start.isoformat(),
+        end=datetime.now(UTC).replace(tzinfo=None).isoformat(),
+        used=used,
+        unused=_unused_in_window(session, start),
+        wasted=wasted,
+        suggested=_suggested_restock(session, used, wasted),
+    )
+
+
+def apply_period_review(session: Session, ingredient_ids: list[int]) -> list[int]:
+    """Push the chosen restock suggestions onto the grocery list."""
+    from app.models import GrocerySource
+    from app.services import grocery as grocery_service
+
+    added = []
+    for ingredient_id in ingredient_ids:
+        ingredient = session.get(Ingredient, ingredient_id)
+        if ingredient is None:
+            continue
+        item = grocery_service.add_to_list(
+            session,
+            ingredient,
+            source=GrocerySource.PERIOD_REVIEW,
+            quantity=ingredient.restock_threshold,
+            unit=ingredient.restock_unit or ingredient.default_unit,
+            note="From your 2-week review",
+        )
+        added.append(item.id)
+    return added

@@ -9,6 +9,7 @@ const LINKS: NavItem[] = [
   { to: '/suggestions', label: 'Cook' },
   { to: '/recipes', label: 'Recipes' },
   { to: '/grocery', label: 'Grocery' },
+  { to: '/review', label: 'Review' },
   { to: '/analytics', label: 'Analytics' },
   { to: '/admin', label: 'Admin' },
 ]

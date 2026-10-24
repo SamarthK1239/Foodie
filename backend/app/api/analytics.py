@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.db import get_session
-from app.schemas import SummaryOut
+from app.schemas import ApplyPeriodReviewRequest, PeriodReviewOut, SummaryOut
 from app.services import analytics
 
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
@@ -51,3 +51,20 @@ def recent_cooks(
     session: Session = Depends(get_session), days: int = Query(default=28, ge=1, le=365)
 ) -> list[dict]:
     return analytics.recent_cooks(session, days)
+
+
+@router.get("/period-review", response_model=PeriodReviewOut)
+def period_review(
+    session: Session = Depends(get_session), weeks: int = Query(default=2, ge=1, le=52)
+) -> PeriodReviewOut:
+    result = analytics.period_review(session, weeks)
+    return PeriodReviewOut(**result.__dict__)
+
+
+@router.post("/period-review/apply")
+def apply_period_review(
+    payload: ApplyPeriodReviewRequest, session: Session = Depends(get_session)
+) -> dict:
+    added = analytics.apply_period_review(session, payload.ingredient_ids)
+    session.commit()
+    return {"added": len(added), "grocery_item_ids": added}
