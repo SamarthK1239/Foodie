@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useRecipes, useSaveRecipe } from '../api/hooks'
+import { FavoriteStar } from '../components/FavoriteStar'
 import {
   Button,
   Card,
@@ -11,6 +12,7 @@ import {
   Loading,
   Modal,
   PageHeader,
+  Select,
   TextArea,
 } from '../components/ui'
 
@@ -94,9 +96,17 @@ export default function Recipes() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
   const [creating, setCreating] = useState(false)
+  const [favoritesOnly, setFavoritesOnly] = useState(false)
+  const [sort, setSort] = useState<'title' | 'favorite'>('title')
   const limit = 24
 
-  const { data, isLoading, error } = useRecipes({ search, limit, offset: page * limit })
+  const { data, isLoading, error } = useRecipes({
+    search,
+    limit,
+    offset: page * limit,
+    favorites_only: favoritesOnly,
+    sort,
+  })
   const pages = data ? Math.ceil(data.total / limit) : 0
 
   return (
@@ -105,7 +115,7 @@ export default function Recipes() {
         title="Recipes"
         subtitle={data ? `${data.total} recipe${data.total === 1 ? '' : 's'} indexed` : undefined}
         action={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Input
               placeholder="Search recipes…"
               value={search}
@@ -115,6 +125,27 @@ export default function Recipes() {
                 setPage(0)
               }}
             />
+            <Select
+              value={sort}
+              className="w-44"
+              onChange={(e) => {
+                setSort(e.target.value as 'title' | 'favorite')
+                setPage(0)
+              }}
+            >
+              <option value="title">Sort: A–Z</option>
+              <option value="favorite">Sort: favourites first</option>
+            </Select>
+            <Button
+              variant={favoritesOnly ? 'primary' : 'secondary'}
+              title="Show only favourites"
+              onClick={() => {
+                setFavoritesOnly((on) => !on)
+                setPage(0)
+              }}
+            >
+              ★ Favourites
+            </Button>
             <Button variant="primary" onClick={() => setCreating(true)}>
               Add recipe
             </Button>
@@ -127,11 +158,19 @@ export default function Recipes() {
 
       {data && data.items.length === 0 && (
         <EmptyState
-          title={search ? 'No recipes match that search' : 'No recipes yet'}
+          title={
+            favoritesOnly
+              ? 'No favourites yet'
+              : search
+                ? 'No recipes match that search'
+                : 'No recipes yet'
+          }
           hint={
-            search
-              ? 'Try a different term.'
-              : 'Add one by hand, or run a recipe import from the Admin page.'
+            favoritesOnly
+              ? 'Star a recipe to keep it close to hand.'
+              : search
+                ? 'Try a different term.'
+                : 'Add one by hand, or run a recipe import from the Admin page.'
           }
         />
       )}
@@ -148,7 +187,10 @@ export default function Recipes() {
                   className="mb-3 h-32 w-full rounded-lg object-cover"
                 />
               )}
-              <p className="font-medium text-white">{recipe.title}</p>
+              <div className="flex items-start justify-between gap-2">
+                <p className="font-medium text-white">{recipe.title}</p>
+                <FavoriteStar id={recipe.id} isFavorite={recipe.is_favorite} className="-mr-1 -mt-1" />
+              </div>
               <p className="mt-1 text-xs text-white/40">
                 {recipe.total_minutes ? `${recipe.total_minutes} min` : 'Time n/a'}
                 {recipe.source_site ? ` · ${recipe.source_site}` : ''}

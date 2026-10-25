@@ -28,6 +28,7 @@ class GrocerySource(enum.StrEnum):
     MANUAL = "manual"
     RECIPE_GAP = "recipe_gap"
     PERIOD_REVIEW = "period_review"
+    MEAL_PLAN = "meal_plan"
 
 
 class GroceryStatus(enum.StrEnum):

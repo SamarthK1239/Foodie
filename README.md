@@ -146,6 +146,41 @@ If a recipe line cannot be matched to a known ingredient it will not count
 towards suggestions. **Admin → Unlinked ingredients** lists these; naming one
 creates an alias and back-links every other recipe using the same text.
 
+**Method formatting.** Instructions are stored as plain text but rendered as
+numbered steps. Lines are the step boundary; a short line ending in a colon
+("For the custard:") becomes a heading and does not consume a step number.
+Sources that already number their steps have that numbering stripped so nothing
+renders as "1. 1. Heat the oven". Crucially, an unbroken blob is **never** split
+on sentence punctuation — "Heat oven to 220C/200C fan/gas 7." would be torn in
+half — so a blob is only re-split when it contains markers that genuinely run
+1, 2, 3.
+
+**Favourites.** Star a recipe from the card grid or its detail page to keep it
+to hand; the list can then be sorted favourites-first or filtered to favourites
+only. Starring is a dedicated endpoint rather than a `PATCH`, because an edit
+sets `is_user_edited` and would quietly opt the recipe out of future re-imports.
+
+## Planning a week
+
+**Add to this week** on a recipe page puts it on the current week's plan
+(weeks run Monday to Sunday) and immediately updates your grocery list.
+
+Requirements are summed **across the whole week**, not maxed: three dishes each
+needing 200 g of pasta need 600 g, and one bag will not do. Current stock is
+subtracted, so the list asks for the shortfall rather than the full amount. If
+any line for an ingredient has no quantity, or a unit that cannot be converted
+("2 cloves" against "30 g"), the whole requirement falls back to a presence
+check — a partial sum would read as the week's total while silently omitting
+lines.
+
+The derived list is recomputed from the plan whenever it changes, and only ever
+touches rows it added itself (`meal_plan`). It will not raise a quantity you set
+by hand, and an ingredient already pending from another source does not get a
+duplicate row. Removing a recipe from the plan withdraws exactly what it added.
+
+Only the current week feeds the grocery list — you shop for the week you are in.
+Planning further ahead is allowed and shows up when you view that week.
+
 ## How suggestions work
 
 Each recipe is scored as:
@@ -256,8 +291,8 @@ the working directory is also read.
 ```
 backend/
   app/
-    api/        FastAPI routers (inventory, recipes, suggestions, grocery, analytics, scan, admin)
-    services/   Business logic: units, inventory ledger, suggestion scoring, cooking, grocery, barcode, OCR
+    api/        FastAPI routers (inventory, recipes, suggestions, grocery, meal plan, analytics, scan, admin)
+    services/   Business logic: units, inventory ledger, suggestion scoring, cooking, grocery, meal plan, barcode, OCR
     ingest/     Polite fetcher, sitemap discovery, recipe import, resumable job runner
     models/     SQLAlchemy entities and enums
     static/     Built SPA (generated — not checked in)
@@ -279,8 +314,9 @@ Interactive docs are served at `/docs` while the app is running.
 | Area | Endpoints |
 | --- | --- |
 | Inventory | `GET/POST /api/inventory/items`, `PATCH/DELETE /api/inventory/items/{id}`, `/adjust`, `/discard`, `/finish`, `/api/inventory/expiring`, `/api/inventory/summary` |
-| Recipes | `GET/POST /api/recipes`, `GET/PATCH/DELETE /api/recipes/{id}`, `POST /api/recipes/{id}/cook` |
+| Recipes | `GET/POST /api/recipes`, `GET/PATCH/DELETE /api/recipes/{id}`, `POST /api/recipes/{id}/cook`, `POST /api/recipes/{id}/favorite` |
 | Suggestions | `GET /api/suggestions`, `GET/PATCH /api/cook-events` |
+| Meal plan | `GET/POST /api/meal-plan`, `DELETE /api/meal-plan/{id}` |
 | Grocery | `GET/POST /api/grocery`, `PATCH/DELETE /api/grocery/{id}`, `POST /api/grocery/clear-purchased` |
 | Analytics | `/api/analytics/summary`, `/spend-by-category`, `/spend-over-time`, `/most-wasted`, `/most-used`, `/recent-cooks`, `/period-review[/apply]` |
 | Scan | `GET /api/scan/barcode/{code}`, `POST /api/scan/to-inventory`, `POST /api/scan/expiry` |

@@ -139,3 +139,107 @@ def test_optional_ingredients_do_not_count_as_missing(client):
 def test_suggestions_empty_without_stock(client):
     make_recipe(client, "Anything", [("1 egg", 1, "unit", False)])
     assert client.get("/api/suggestions").json() == []
+
+
+def set_favorite(client, recipe_id: int, value: bool):
+    response = client.post(f"/api/recipes/{recipe_id}/favorite", json={"is_favorite": value})
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def test_recipes_start_unfavorited_and_toggle(client):
+    recipe = make_recipe(client, "Soup", [("1 onion", 1, "unit", False)])
+    assert recipe["is_favorite"] is False
+
+    assert set_favorite(client, recipe["id"], True)["is_favorite"] is True
+    assert client.get(f"/api/recipes/{recipe['id']}").json()["is_favorite"] is True
+
+    assert set_favorite(client, recipe["id"], False)["is_favorite"] is False
+
+
+def test_favoriting_does_not_mark_a_recipe_hand_edited(client, session):
+    # Starring is not editing. Going through PATCH would set is_user_edited and
+    # quietly opt the recipe out of future re-imports.
+    from app.models import Recipe
+
+    recipe = make_recipe(client, "Soup", [("1 onion", 1, "unit", False)])
+    stored = session.get(Recipe, recipe["id"])
+    stored.is_user_edited = False
+    session.commit()
+
+    set_favorite(client, recipe["id"], True)
+
+    session.expire_all()
+    stored = session.get(Recipe, recipe["id"])
+    assert stored.is_favorite is True
+    assert stored.is_user_edited is False
+
+
+def test_sorting_by_favorite_puts_starred_recipes_first(client):
+    make_recipe(client, "Apple cake", [("1 apple", 1, "unit", False)])
+    zebra = make_recipe(client, "Zebra cake", [("1 egg", 1, "unit", False)])
+    set_favorite(client, zebra["id"], True)
+
+    titles = [r["title"] for r in client.get("/api/recipes").json()["items"]]
+    assert titles == ["Apple cake", "Zebra cake"]
+
+    sorted_titles = [
+        r["title"] for r in client.get("/api/recipes", params={"sort": "favorite"}).json()["items"]
+    ]
+    assert sorted_titles == ["Zebra cake", "Apple cake"]
+
+
+def test_favorites_only_filters_and_counts(client):
+    make_recipe(client, "Apple cake", [("1 apple", 1, "unit", False)])
+    zebra = make_recipe(client, "Zebra cake", [("1 egg", 1, "unit", False)])
+    set_favorite(client, zebra["id"], True)
+
+    body = client.get("/api/recipes", params={"favorites_only": True}).json()
+    assert [r["title"] for r in body["items"]] == ["Zebra cake"]
+    assert body["total"] == 1
+
+
+def test_favorites_only_applies_to_search_results(client):
+    make_recipe(client, "Apple cake", [("1 apple", 1, "unit", False)])
+    starred = make_recipe(client, "Apple pie", [("1 apple", 1, "unit", False)])
+    set_favorite(client, starred["id"], True)
+
+    body = client.get("/api/recipes", params={"search": "apple", "favorites_only": True}).json()
+    assert [r["title"] for r in body["items"]] == ["Apple pie"]
+    assert body["total"] == 1
+
+
+def test_search_sorted_by_favorite_floats_starred_matches(client):
+    make_recipe(client, "Apple cake", [("1 apple", 1, "unit", False)])
+    pie = make_recipe(client, "Apple pie", [("1 apple", 1, "unit", False)])
+    set_favorite(client, pie["id"], True)
+
+    body = client.get("/api/recipes", params={"search": "apple", "sort": "favorite"}).json()
+    assert [r["title"] for r in body["items"]][0] == "Apple pie"
+    assert body["total"] == 2
+
+
+def test_favorites_only_search_pages_correctly(client):
+    # Favourites must be filtered inside the search, not after paging it:
+    # otherwise page one is cut to `limit` first and comes back short.
+    for n in range(6):
+        recipe = make_recipe(client, f"Apple bake {n}", [("1 apple", 1, "unit", False)])
+        if n % 2 == 0:
+            set_favorite(client, recipe["id"], True)
+
+    body = client.get(
+        "/api/recipes", params={"search": "apple", "favorites_only": True, "limit": 2}
+    ).json()
+    assert body["total"] == 3
+    assert len(body["items"]) == 2
+    assert all(r["is_favorite"] for r in body["items"])
+
+    page_two = client.get(
+        "/api/recipes",
+        params={"search": "apple", "favorites_only": True, "limit": 2, "offset": 2},
+    ).json()
+    assert page_two["total"] == 3
+    assert len(page_two["items"]) == 1
+
+    seen = {r["id"] for r in body["items"]} | {r["id"] for r in page_two["items"]}
+    assert len(seen) == 3

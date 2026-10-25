@@ -10,6 +10,8 @@ import type {
   GroceryStatus,
   IngestStatusResponse,
   Ingredient,
+  MealPlanEntry,
+  MealPlanWeek,
   PeriodReview,
   InventoryItem,
   InventorySummary,
@@ -124,7 +126,15 @@ export function useUpdateIngredient() {
 
 // --- Recipes ---------------------------------------------------------------------
 
-export function useRecipes(params: { search?: string; limit?: number; offset?: number } = {}) {
+export function useRecipes(
+  params: {
+    search?: string
+    limit?: number
+    offset?: number
+    favorites_only?: boolean
+    sort?: 'title' | 'favorite'
+  } = {},
+) {
   return useQuery({
     queryKey: ['recipes', params],
     queryFn: () => api.get<RecipeList>(`/api/recipes${qs(params)}`),
@@ -174,8 +184,53 @@ export function useDeleteRecipe() {
   })
 }
 
-// --- Suggestions & cooking -------------------------------------------------------
+export function useSetFavorite() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, isFavorite }: { id: number; isFavorite: boolean }) =>
+      api.post<Recipe>(`/api/recipes/${id}/favorite`, { is_favorite: isFavorite }),
+    onSuccess: (saved) => {
+      queryClient.invalidateQueries({ queryKey: ['recipes'] })
+      queryClient.invalidateQueries({ queryKey: ['recipe', saved.id] })
+    },
+  })
+}
 
+// --- Meal plan -------------------------------------------------------------------
+
+// Planning changes what you need to buy, so the grocery list moves with it.
+const PLAN_DEPENDENT = ['meal-plan', 'grocery']
+
+export function useMealPlanWeek(weekStart?: string) {
+  const params = weekStart ? { week_start: weekStart } : {}
+  return useQuery({
+    queryKey: ['meal-plan', params],
+    queryFn: () => api.get<MealPlanWeek>(`/api/meal-plan${qs(params)}`),
+  })
+}
+
+export function useAddToWeek() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: (body: {
+      recipe_id: number
+      week_start?: string
+      servings_multiplier?: number
+      note?: string
+    }) => api.post<MealPlanEntry>('/api/meal-plan', body),
+    onSuccess: () => invalidate(PLAN_DEPENDENT),
+  })
+}
+
+export function useRemoveFromWeek() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: (id: number) => api.delete<void>(`/api/meal-plan/${id}`),
+    onSuccess: () => invalidate(PLAN_DEPENDENT),
+  })
+}
+
+// --- Suggestions & cooking -------------------------------------------------------
 export function useSuggestions(params: { limit?: number; offset?: number; min_coverage?: number } = {}) {
   return useQuery({
     queryKey: ['suggestions', params],

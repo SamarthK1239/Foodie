@@ -9,7 +9,13 @@ from app.db import get_session
 from app.ingest.parsing import parse_ingredient_line
 from app.models import Recipe, RecipeIngredient
 from app.models.entities import utcnow
-from app.schemas import RecipeCreate, RecipeListOut, RecipeOut, RecipeUpdate
+from app.schemas import (
+    FavoriteRequest,
+    RecipeCreate,
+    RecipeListOut,
+    RecipeOut,
+    RecipeUpdate,
+)
 from app.services.ingredients import IngredientResolver
 from app.services.units import normalize_unit
 
@@ -50,6 +56,8 @@ def _apply_ingredients(
 def list_recipes(
     session: Session = Depends(get_session),
     search: str | None = None,
+    favorites_only: bool = False,
+    sort: str = Query(default="title", pattern="^(title|favorite)$"),
     limit: int = Query(default=24, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ) -> RecipeListOut:
@@ -57,30 +65,52 @@ def list_recipes(
         match_expr = _fts_query(search)
         if not match_expr:
             return RecipeListOut(total=0, items=[])
-        rows = session.execute(
-            text(
-                "SELECT rowid FROM recipes_fts WHERE recipes_fts MATCH :q "
-                "ORDER BY rank LIMIT :limit OFFSET :offset"
-            ),
-            {"q": match_expr, "limit": limit, "offset": offset},
-        ).scalars()
-        ids = list(rows)
+        # The favourites filter has to be applied inside the FTS query, not
+        # after paging it: filtering a page that was already cut to `limit`
+        # would return short pages and a total that only counts the page.
+        source = "recipes_fts"
+        condition = "recipes_fts MATCH :q"
+        if favorites_only:
+            source = "recipes_fts JOIN recipe ON recipe.id = recipes_fts.rowid"
+            condition = "recipes_fts MATCH :q AND recipe.is_favorite = 1"
+
+        ids = list(
+            session.execute(
+                text(
+                    f"SELECT recipes_fts.rowid FROM {source} WHERE {condition} "
+                    "ORDER BY rank LIMIT :limit OFFSET :offset"
+                ),
+                {"q": match_expr, "limit": limit, "offset": offset},
+            ).scalars()
+        )
         total = session.execute(
-            text("SELECT count(*) FROM recipes_fts WHERE recipes_fts MATCH :q"),
+            text(f"SELECT count(*) FROM {source} WHERE {condition}"),
             {"q": match_expr},
         ).scalar_one()
         if not ids:
             return RecipeListOut(total=total, items=[])
-        recipes = list(
-            session.execute(select(Recipe).where(Recipe.id.in_(ids))).unique().scalars()
-        )
+
+        recipes = list(session.execute(select(Recipe).where(Recipe.id.in_(ids))).unique().scalars())
+        # Relevance is the point of a search, so favourites float to the top of
+        # the matches rather than reordering them outright.
         order = {rid: i for i, rid in enumerate(ids)}
         recipes.sort(key=lambda r: order.get(r.id, 1_000_000))
+        if sort == "favorite":
+            recipes.sort(key=lambda r: not r.is_favorite)
         return RecipeListOut(total=total, items=[recipe_summary(r) for r in recipes])
 
-    total = session.execute(select(func.count()).select_from(Recipe)).scalar_one()
-    stmt = select(Recipe).order_by(Recipe.title).limit(limit).offset(offset)
-    recipes = session.execute(stmt).unique().scalars()
+    count_stmt = select(func.count()).select_from(Recipe)
+    stmt = select(Recipe)
+    if favorites_only:
+        count_stmt = count_stmt.where(Recipe.is_favorite.is_(True))
+        stmt = stmt.where(Recipe.is_favorite.is_(True))
+
+    total = session.execute(count_stmt).scalar_one()
+    if sort == "favorite":
+        stmt = stmt.order_by(Recipe.is_favorite.desc(), Recipe.title)
+    else:
+        stmt = stmt.order_by(Recipe.title)
+    recipes = session.execute(stmt.limit(limit).offset(offset)).unique().scalars()
     return RecipeListOut(total=total, items=[recipe_summary(r) for r in recipes])
 
 
@@ -145,6 +175,21 @@ def update_recipe(
     # Protect hand-edited recipes from being clobbered by a later re-crawl.
     recipe.is_user_edited = True
     recipe.updated_at = utcnow()
+    session.flush()
+    return recipe_out(recipe)
+
+
+@router.post("/{recipe_id}/favorite", response_model=RecipeOut)
+def set_favorite(
+    recipe_id: int, payload: FavoriteRequest, session: Session = Depends(get_session)
+) -> RecipeOut:
+    """Deliberately not part of PATCH: starring a recipe is not editing it, and
+    going through update_recipe would mark it hand-edited and quietly opt it out
+    of future re-imports."""
+    recipe = session.get(Recipe, recipe_id)
+    if recipe is None:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    recipe.is_favorite = payload.is_favorite
     session.flush()
     return recipe_out(recipe)
 

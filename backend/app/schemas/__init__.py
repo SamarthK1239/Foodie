@@ -144,6 +144,10 @@ class RecipeUpdate(BaseModel):
     ingredients: list[RecipeIngredientIn] | None = None
 
 
+class FavoriteRequest(BaseModel):
+    is_favorite: bool
+
+
 class RecipeSummary(ORMModel):
     id: int
     title: str
@@ -152,6 +156,7 @@ class RecipeSummary(ORMModel):
     image_url: str | None
     servings: int | None
     total_minutes: int | None
+    is_favorite: bool = False
     tags: list[str] = []
 
 
@@ -354,3 +359,38 @@ class ExpiryScanOut(BaseModel):
     available: bool
     candidates: list[ExpiryCandidateOut] = []
     text: str = ""
+
+
+# --- Meal plan -------------------------------------------------------------------
+
+
+class MealPlanAdd(BaseModel):
+    recipe_id: int
+    week_start: date | None = None
+    servings_multiplier: float = Field(default=1.0, gt=0)
+    note: str | None = None
+
+
+class MealPlanEntryOut(BaseModel):
+    id: int
+    week_start: date
+    servings_multiplier: float
+    note: str | None = None
+    recipe: RecipeSummary
+
+
+class PlannedNeedOut(BaseModel):
+    ingredient_id: int
+    name: str
+    needed: float | None
+    unit: str | None
+    in_stock: float
+    missing: float | None
+    recipes: list[str] = []
+
+
+class MealPlanWeekOut(BaseModel):
+    week_start: date
+    week_end: date
+    entries: list[MealPlanEntryOut] = []
+    shortfalls: list[PlannedNeedOut] = []

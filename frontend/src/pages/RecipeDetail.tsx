@@ -1,7 +1,16 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { useCook, useDeleteRecipe, useRecipe, useSaveRecipe } from '../api/hooks'
+import {
+  useAddToWeek,
+  useCook,
+  useDeleteRecipe,
+  useMealPlanWeek,
+  useRecipe,
+  useRemoveFromWeek,
+  useSaveRecipe,
+} from '../api/hooks'
 import type { CookResult } from '../api/types'
+import { FavoriteStar } from '../components/FavoriteStar'
 import {
   Button,
   Card,
@@ -14,6 +23,55 @@ import {
   TextArea,
 } from '../components/ui'
 import { formatQuantity } from '../lib/format'
+import { parseMethod } from '../lib/method'
+
+function Method({ instructions }: { instructions: string }) {
+  const blocks = parseMethod(instructions)
+  if (blocks.length === 0) {
+    return <p className="text-sm text-white/40">No method recorded.</p>
+  }
+
+  // Headings must not consume a step number, so number the steps up front
+  // rather than deriving a number from each block's index.
+  const numbers: (number | null)[] = []
+  let seen = 0
+  for (const block of blocks) {
+    if (block.kind === 'step') seen += 1
+    numbers.push(block.kind === 'step' ? seen : null)
+  }
+
+  return (
+    <ol className="space-y-4">
+      {blocks.map((block, index) => {
+        if (block.kind === 'heading') {
+          return (
+            <li
+              key={index}
+              className="pt-2 text-xs font-semibold uppercase tracking-wide text-emerald-300/80 first:pt-0"
+            >
+              {block.text}
+            </li>
+          )
+        }
+        if (block.kind === 'paragraph') {
+          return (
+            <li key={index} className="text-sm leading-relaxed text-white/80">
+              {block.text}
+            </li>
+          )
+        }
+        return (
+          <li key={index} className="flex gap-3">
+            <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-xs font-semibold text-emerald-300">
+              {numbers[index]}
+            </span>
+            <p className="text-sm leading-relaxed text-white/80">{block.text}</p>
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
 
 function EditForm({
   recipe,
@@ -99,9 +157,14 @@ export default function RecipeDetail() {
   const { data: recipe, isLoading, error } = useRecipe(recipeId)
   const cook = useCook()
   const remove = useDeleteRecipe()
+  const week = useMealPlanWeek()
+  const addToWeek = useAddToWeek()
+  const removeFromWeek = useRemoveFromWeek()
   const [editing, setEditing] = useState(false)
   const [multiplier, setMultiplier] = useState('1')
   const [result, setResult] = useState<CookResult | null>(null)
+
+  const planned = week.data?.entries.find((entry) => entry.recipe.id === recipeId)
 
   if (isLoading) return <Loading what="recipe" />
   if (error) return <ErrorNote error={error} />
@@ -123,7 +186,8 @@ export default function RecipeDetail() {
           .filter(Boolean)
           .join(' · ')}
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <FavoriteStar id={recipe.id} isFavorite={recipe.is_favorite} />
             <Input
               type="number"
               min="0.25"
@@ -145,6 +209,28 @@ export default function RecipeDetail() {
             >
               {cook.isPending ? 'Cooking…' : 'I cooked this'}
             </Button>
+            {planned ? (
+              <Button
+                disabled={removeFromWeek.isPending}
+                title="Remove from this week's plan"
+                onClick={() => removeFromWeek.mutate(planned.id)}
+              >
+                {removeFromWeek.isPending ? 'Removing…' : '✓ Planned this week'}
+              </Button>
+            ) : (
+              <Button
+                disabled={addToWeek.isPending}
+                title="Plan this for the current week and add what's missing to the grocery list"
+                onClick={() =>
+                  addToWeek.mutate({
+                    recipe_id: recipe.id,
+                    servings_multiplier: Number(multiplier) || 1,
+                  })
+                }
+              >
+                {addToWeek.isPending ? 'Adding…' : 'Add to this week'}
+              </Button>
+            )}
             <Button onClick={() => setEditing(true)}>Edit</Button>
             <Button
               variant="danger"
@@ -203,9 +289,7 @@ export default function RecipeDetail() {
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-white/50">
             Method
           </h2>
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-white/80">
-            {recipe.instructions || 'No method recorded.'}
-          </p>
+          <Method instructions={recipe.instructions} />
           {recipe.source_url && (
             <a
               href={recipe.source_url}

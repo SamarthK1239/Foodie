@@ -134,6 +134,7 @@ class Recipe(Base):
     tags: Mapped[str | None] = mapped_column(Text)
     raw_json: Mapped[str | None] = mapped_column(Text)
     is_user_edited: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_favorite: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
     last_scraped_at: Mapped[datetime | None] = mapped_column(DateTime)
@@ -159,6 +160,27 @@ class RecipeIngredient(Base):
 
     recipe: Mapped[Recipe] = relationship(back_populates="ingredients")
     ingredient: Mapped[Ingredient | None] = relationship(lazy="joined")
+
+
+class MealPlanEntry(Base):
+    """A recipe planned for a given week. Drives the week's grocery requirements."""
+
+    __tablename__ = "meal_plan_entry"
+    __table_args__ = (
+        # The same recipe twice in one week is a double batch, not two entries.
+        UniqueConstraint("recipe_id", "week_start", name="uq_meal_plan_recipe_week"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    recipe_id: Mapped[int] = mapped_column(
+        ForeignKey("recipe.id", ondelete="CASCADE"), index=True
+    )
+    week_start: Mapped[date] = mapped_column(Date, index=True)
+    servings_multiplier: Mapped[float] = mapped_column(Float, default=1.0)
+    note: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    recipe: Mapped[Recipe] = relationship(lazy="joined")
 
 
 class CookEvent(Base):

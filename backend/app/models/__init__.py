@@ -6,6 +6,7 @@ from app.models.entities import (
     IngredientAlias,
     InventoryItem,
     InventoryTransaction,
+    MealPlanEntry,
     ProductLookup,
     Recipe,
     RecipeIngredient,
@@ -25,6 +26,7 @@ from app.models.enums import (
 
 __all__ = [
     "CookEvent",
+    "MealPlanEntry",
     "ExpiryBucket",
     "GroceryItem",
     "GrocerySource",

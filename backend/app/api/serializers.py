@@ -56,6 +56,7 @@ def recipe_summary(recipe: Recipe) -> RecipeSummary:
         image_url=recipe.image_url,
         servings=recipe.servings,
         total_minutes=recipe.total_minutes,
+        is_favorite=recipe.is_favorite,
         tags=load_tags(recipe.tags),
     )
 

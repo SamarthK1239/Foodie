@@ -2,7 +2,12 @@ export type ExpiryBucket = 'expired' | 'critical' | 'soon' | 'ok' | 'none'
 export type ItemStatus = 'active' | 'consumed' | 'discarded'
 export type StorageLocation = 'fridge' | 'freezer' | 'pantry' | 'other'
 export type GroceryStatus = 'pending' | 'purchased' | 'dismissed'
-export type GrocerySource = 'auto_depleted' | 'manual' | 'recipe_gap' | 'period_review'
+export type GrocerySource =
+  | 'auto_depleted'
+  | 'manual'
+  | 'recipe_gap'
+  | 'period_review'
+  | 'meal_plan'
 
 export interface Ingredient {
   id: number
@@ -49,6 +54,7 @@ export interface RecipeSummary {
   servings: number | null
   total_minutes: number | null
   tags: string[]
+  is_favorite: boolean
 }
 
 export interface Recipe extends RecipeSummary {
@@ -60,6 +66,31 @@ export interface Recipe extends RecipeSummary {
 export interface RecipeList {
   total: number
   items: RecipeSummary[]
+}
+
+export interface MealPlanEntry {
+  id: number
+  week_start: string
+  servings_multiplier: number
+  note: string | null
+  recipe: RecipeSummary
+}
+
+export interface PlannedNeed {
+  ingredient_id: number
+  name: string
+  needed: number | null
+  unit: string | null
+  in_stock: number
+  missing: number | null
+  recipes: string[]
+}
+
+export interface MealPlanWeek {
+  week_start: string
+  week_end: string
+  entries: MealPlanEntry[]
+  shortfalls: PlannedNeed[]
 }
 
 export interface Match {
