@@ -71,11 +71,21 @@ export function Button({
   )
 }
 
+/**
+ * Tailwind emits every utility it is given, so appending `w-20` to a class list
+ * that already contains `w-full` does not override it — stylesheet order decides,
+ * and `w-full` wins. Callers that size a control therefore need the default
+ * dropped rather than appended to.
+ */
+function widthFor(className: string | undefined): string {
+  return /(?:^|\s)(?:w-|md:w-|sm:w-|lg:w-)/.test(className ?? '') ? '' : 'w-full'
+}
+
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className={`min-h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-emerald-500/60 md:min-h-0 ${props.className ?? ''}`}
+      className={`min-h-11 ${widthFor(props.className)} rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-emerald-500/60 md:min-h-0 ${props.className ?? ''}`}
     />
   )
 }
@@ -84,7 +94,7 @@ export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
       {...props}
-      className={`min-h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-emerald-500/60 md:min-h-0 ${props.className ?? ''}`}
+      className={`min-h-11 ${widthFor(props.className)} rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-emerald-500/60 md:min-h-0 ${props.className ?? ''}`}
     />
   )
 }

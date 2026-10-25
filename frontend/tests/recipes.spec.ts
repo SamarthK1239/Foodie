@@ -120,3 +120,22 @@ test('planning a recipe for the week fills the grocery list', async ({ page, req
     0,
   )
 })
+
+test('the recipe detail toolbar stays on one row at desktop width', async ({ page, request }) => {
+  const recipe = await makeRecipe(request, 'Toolbar check', INGREDIENTS)
+  await page.setViewportSize({ width: 1100, height: 900 })
+  await page.goto(`/recipes/${recipe.id}`, { waitUntil: 'domcontentloaded' })
+
+  // The shared Input hardcodes a width, and Tailwind resolves a duplicated
+  // width utility by stylesheet order rather than by the order classes are
+  // listed, so a plain `w-20` override loses to it. The batch multiplier then
+  // spans the header and shunts the action buttons onto their own rows.
+  const multiplier = page.locator('input[type=number][title="Batch multiplier"]')
+  const deleteButton = page.getByRole('button', { name: 'Delete' })
+  await expect(multiplier).toBeVisible()
+
+  const mBox = (await multiplier.boundingBox())!
+  const dBox = (await deleteButton.boundingBox())!
+  expect(mBox.width).toBeLessThan(120)
+  expect(Math.abs(mBox.y - dBox.y)).toBeLessThan(mBox.height)
+})

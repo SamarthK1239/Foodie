@@ -119,7 +119,7 @@ export default function Recipes() {
             <Input
               placeholder="Search recipes…"
               value={search}
-              className="w-64"
+              className="w-full sm:w-64"
               onChange={(e) => {
                 setSearch(e.target.value)
                 setPage(0)
@@ -127,7 +127,7 @@ export default function Recipes() {
             />
             <Select
               value={sort}
-              className="w-44"
+              className="w-full sm:w-44"
               onChange={(e) => {
                 setSort(e.target.value as 'title' | 'favorite')
                 setPage(0)

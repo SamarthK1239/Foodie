@@ -188,15 +188,19 @@ export default function RecipeDetail() {
         action={
           <div className="flex flex-wrap items-center gap-2">
             <FavoriteStar id={recipe.id} isFavorite={recipe.is_favorite} />
-            <Input
-              type="number"
-              min="0.25"
-              step="0.25"
-              value={multiplier}
-              className="w-20"
-              title="Batch multiplier"
-              onChange={(e) => setMultiplier(e.target.value)}
-            />
+            <label className="flex items-center gap-1 text-sm text-white/50">
+              <span aria-hidden>×</span>
+              <span className="sr-only">Batch multiplier</span>
+              <Input
+                type="number"
+                min="0.25"
+                step="0.25"
+                value={multiplier}
+                className="w-20"
+                title="Batch multiplier"
+                onChange={(e) => setMultiplier(e.target.value)}
+              />
+            </label>
             <Button
               variant="primary"
               disabled={cook.isPending}
