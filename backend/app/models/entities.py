@@ -18,12 +18,14 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
 from app.models.enums import (
+    DietClass,
     GrocerySource,
     GroceryStatus,
     IngestMode,
     IngestStatus,
     ItemStatus,
     LeftoverState,
+    MealType,
     StorageLocation,
     TransactionReason,
 )
@@ -132,6 +134,13 @@ class Recipe(Base):
     total_minutes: Mapped[int | None] = mapped_column(Integer)
     image_url: Mapped[str | None] = mapped_column(String(800))
     tags: Mapped[str | None] = mapped_column(Text)
+    # Inferred by app.services.classify from the ingredient list and tags, and
+    # stored rather than computed per request so the list endpoint can filter
+    # and page in SQL. NULL means "not yet classified" and is backfilled at
+    # startup; it is not a valid steady state.
+    diet: Mapped[DietClass | None] = mapped_column(String(16), index=True)
+    meat_types: Mapped[str | None] = mapped_column(Text)
+    meal_type: Mapped[MealType | None] = mapped_column(String(16), index=True)
     raw_json: Mapped[str | None] = mapped_column(Text)
     is_user_edited: Mapped[bool] = mapped_column(Boolean, default=False)
     is_favorite: Mapped[bool] = mapped_column(Boolean, default=False, index=True)

@@ -45,6 +45,17 @@ export interface RecipeIngredient {
   ingredient: Ingredient | null
 }
 
+export type DietClass = 'vegan' | 'vegetarian' | 'meat'
+export type MeatType = 'beef' | 'pork' | 'chicken' | 'lamb' | 'fish' | 'game'
+export type MealType =
+  | 'breakfast'
+  | 'lunch'
+  | 'dinner'
+  | 'dessert'
+  | 'side'
+  | 'drink'
+  | 'other'
+
 export interface RecipeSummary {
   id: number
   title: string
@@ -55,6 +66,9 @@ export interface RecipeSummary {
   total_minutes: number | null
   tags: string[]
   is_favorite: boolean
+  diet: DietClass | null
+  meat_types: MeatType[]
+  meal_type: MealType | null
 }
 
 export interface Recipe extends RecipeSummary {

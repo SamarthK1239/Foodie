@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 from app.models import Recipe
 from app.schemas import (
     InventoryItemOut,
@@ -9,24 +7,7 @@ from app.schemas import (
     RecipeSummary,
 )
 from app.services.inventory import days_left, expiry_bucket
-
-
-def load_tags(raw: str | None) -> list[str]:
-    if not raw:
-        return []
-    try:
-        value = json.loads(raw)
-    except (ValueError, TypeError):
-        return [t.strip() for t in raw.split(",") if t.strip()]
-    if isinstance(value, list):
-        return [str(v) for v in value]
-    return []
-
-
-def dump_tags(tags: list[str] | None) -> str | None:
-    if tags is None:
-        return None
-    return json.dumps(sorted({t.strip() for t in tags if t and t.strip()}))
+from app.services.tags import load_tags
 
 
 def item_out(item) -> InventoryItemOut:
@@ -58,6 +39,9 @@ def recipe_summary(recipe: Recipe) -> RecipeSummary:
         total_minutes=recipe.total_minutes,
         is_favorite=recipe.is_favorite,
         tags=load_tags(recipe.tags),
+        diet=recipe.diet,
+        meat_types=load_tags(recipe.meat_types),
+        meal_type=recipe.meal_type,
     )
 
 

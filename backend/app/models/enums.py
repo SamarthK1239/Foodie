@@ -59,6 +59,26 @@ class ExpiryBucket(enum.StrEnum):
     NONE = "none"
 
 
+class DietClass(enum.StrEnum):
+    """Inferred from the ingredient list. VEGAN is a strict subset of
+    VEGETARIAN, so a vegetarian filter must match both."""
+
+    VEGAN = "vegan"
+    VEGETARIAN = "vegetarian"
+    MEAT = "meat"
+    UNKNOWN = "unknown"
+
+
+class MealType(enum.StrEnum):
+    BREAKFAST = "breakfast"
+    LUNCH = "lunch"
+    DINNER = "dinner"
+    DESSERT = "dessert"
+    SIDE = "side"
+    DRINK = "drink"
+    OTHER = "other"
+
+
 class LeftoverState(enum.StrEnum):
     """Phase 2 groundwork: what happened to a cooked dish."""
 

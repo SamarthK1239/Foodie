@@ -7,11 +7,13 @@ from pathlib import Path
 
 from alembic.config import Config
 from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
 
 from alembic import command
 from app.config import settings
 from app.db import SessionLocal, engine
 from app.models import Recipe
+from app.services.classify import classify_recipe
 
 logger = logging.getLogger(__name__)
 
@@ -55,3 +57,26 @@ def needs_seeding() -> bool:
         logger.info("Found %d existing recipes, skipping initial seed", count)
         return False
     return True
+
+
+def backfill_classifications() -> int:
+    """Label any recipe the classifier has not seen yet.
+
+    Runs on every boot but only touches rows where `diet` is NULL, so it costs
+    one indexed count on a steady-state database and quietly repairs one that
+    was dropped in from an older version.
+    """
+    with SessionLocal() as session:
+        recipes = list(
+            session.execute(
+                select(Recipe)
+                .where(Recipe.diet.is_(None))
+                .options(selectinload(Recipe.ingredients))
+            ).unique().scalars()
+        )
+        for recipe in recipes:
+            classify_recipe(recipe)
+        if recipes:
+            session.commit()
+            logger.info("Classified %d previously unlabelled recipes", len(recipes))
+        return len(recipes)

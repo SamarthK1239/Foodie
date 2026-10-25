@@ -1,7 +1,16 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useRecipes, useSaveRecipe } from '../api/hooks'
+import type { MealType, RecipeSummary } from '../api/types'
 import { FavoriteStar } from '../components/FavoriteStar'
+import {
+  DIET_FILTER_OPTIONS,
+  MEAL_TYPE_LABELS,
+  dietBadge,
+  dietFilterParams,
+  tagsWorthShowing,
+  type DietFilter,
+} from '../lib/recipeLabels'
 import {
   Button,
   Card,
@@ -92,11 +101,44 @@ function NewRecipeForm({ onDone }: { onDone: () => void }) {
   )
 }
 
+function RecipeBadges({ recipe }: { recipe: RecipeSummary }) {
+  const badge = dietBadge(recipe.diet, recipe.meat_types)
+  const meal = recipe.meal_type ? MEAL_TYPE_LABELS[recipe.meal_type] : null
+  const tags = tagsWorthShowing(recipe.tags, recipe.meal_type).slice(0, 2)
+  if (!badge && !meal && tags.length === 0) return null
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-1">
+      {badge && (
+        <span
+          className={`rounded-full px-2 py-0.5 text-xs ${
+            badge.tone === 'green'
+              ? 'bg-emerald-500/15 text-emerald-300'
+              : 'bg-amber-500/10 text-amber-200/80'
+          }`}
+        >
+          {badge.label}
+        </span>
+      )}
+      {meal && meal !== 'Other' && (
+        <span className="rounded-full bg-white/5 px-2 py-0.5 text-xs text-white/50">{meal}</span>
+      )}
+      {tags.map((tag) => (
+        <span key={tag} className="rounded-full bg-white/5 px-2 py-0.5 text-xs text-white/40">
+          {tag}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 export default function Recipes() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
   const [creating, setCreating] = useState(false)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
+  const [dietFilter, setDietFilter] = useState<DietFilter>('')
+  const [mealType, setMealType] = useState<MealType | ''>('')
   const [sort, setSort] = useState<'title' | 'favorite'>('title')
   const limit = 24
 
@@ -105,9 +147,12 @@ export default function Recipes() {
     limit,
     offset: page * limit,
     favorites_only: favoritesOnly,
+    ...dietFilterParams(dietFilter),
+    meal_type: mealType || undefined,
     sort,
   })
   const pages = data ? Math.ceil(data.total / limit) : 0
+  const filtered = Boolean(dietFilter || mealType || favoritesOnly)
 
   return (
     <>
@@ -126,6 +171,7 @@ export default function Recipes() {
               }}
             />
             <Select
+              aria-label="Sort"
               value={sort}
               className="w-full sm:w-44"
               onChange={(e) => {
@@ -135,6 +181,37 @@ export default function Recipes() {
             >
               <option value="title">Sort: A–Z</option>
               <option value="favorite">Sort: favourites first</option>
+            </Select>
+            <Select
+              aria-label="Diet"
+              value={dietFilter}
+              className="w-full sm:w-44"
+              onChange={(e) => {
+                setDietFilter(e.target.value as DietFilter)
+                setPage(0)
+              }}
+            >
+              {DIET_FILTER_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+            <Select
+              aria-label="Meal type"
+              value={mealType}
+              className="w-full sm:w-40"
+              onChange={(e) => {
+                setMealType(e.target.value as MealType | '')
+                setPage(0)
+              }}
+            >
+              <option value="">Any meal</option>
+              {(Object.keys(MEAL_TYPE_LABELS) as MealType[]).map((m) => (
+                <option key={m} value={m}>
+                  {MEAL_TYPE_LABELS[m]}
+                </option>
+              ))}
             </Select>
             <Button
               variant={favoritesOnly ? 'primary' : 'secondary'}
@@ -159,18 +236,14 @@ export default function Recipes() {
       {data && data.items.length === 0 && (
         <EmptyState
           title={
-            favoritesOnly
-              ? 'No favourites yet'
-              : search
-                ? 'No recipes match that search'
-                : 'No recipes yet'
+            filtered || search
+              ? 'No recipes match those filters'
+              : 'No recipes yet'
           }
           hint={
-            favoritesOnly
-              ? 'Star a recipe to keep it close to hand.'
-              : search
-                ? 'Try a different term.'
-                : 'Add one by hand, or run a recipe import from the Admin page.'
+            filtered || search
+              ? 'Try widening the diet or meal filter, or clearing the search.'
+              : 'Add one by hand, or run a recipe import from the Admin page.'
           }
         />
       )}
@@ -195,18 +268,7 @@ export default function Recipes() {
                 {recipe.total_minutes ? `${recipe.total_minutes} min` : 'Time n/a'}
                 {recipe.source_site ? ` · ${recipe.source_site}` : ''}
               </p>
-              {recipe.tags.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {recipe.tags.slice(0, 3).map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded-full bg-white/5 px-2 py-0.5 text-xs text-white/50"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
+              <RecipeBadges recipe={recipe} />
             </Card>
           </Link>
         ))}

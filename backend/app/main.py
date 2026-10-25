@@ -16,7 +16,7 @@ from app.config import settings
 from app.db import SessionLocal
 from app.ingest import runner
 from app.models import IngestMode
-from app.startup import needs_seeding, run_migrations
+from app.startup import backfill_classifications, needs_seeding, run_migrations
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)-7s %(name)s: %(message)s"
@@ -29,6 +29,7 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     run_migrations()
+    backfill_classifications()
     if needs_seeding() and settings.scrape_sites:
         logger.info("Empty recipe database detected, starting initial seed crawl")
         with SessionLocal() as session:

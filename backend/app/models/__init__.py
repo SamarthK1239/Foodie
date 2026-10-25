@@ -13,6 +13,7 @@ from app.models.entities import (
     utcnow,
 )
 from app.models.enums import (
+    DietClass,
     ExpiryBucket,
     GrocerySource,
     GroceryStatus,
@@ -20,6 +21,7 @@ from app.models.enums import (
     IngestStatus,
     ItemStatus,
     LeftoverState,
+    MealType,
     StorageLocation,
     TransactionReason,
 )
@@ -27,6 +29,7 @@ from app.models.enums import (
 __all__ = [
     "CookEvent",
     "MealPlanEntry",
+    "DietClass",
     "ExpiryBucket",
     "GroceryItem",
     "GrocerySource",
@@ -40,6 +43,7 @@ __all__ = [
     "InventoryTransaction",
     "ItemStatus",
     "LeftoverState",
+    "MealType",
     "ProductLookup",
     "Recipe",
     "RecipeIngredient",

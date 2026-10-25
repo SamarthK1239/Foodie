@@ -5,6 +5,7 @@ import type {
   AnalyticsSummary,
   CookEvent,
   CookResult,
+  DietClass,
   ExpiryScan,
   GroceryItem,
   GroceryStatus,
@@ -12,6 +13,8 @@ import type {
   Ingredient,
   MealPlanEntry,
   MealPlanWeek,
+  MealType,
+  MeatType,
   PeriodReview,
   InventoryItem,
   InventorySummary,
@@ -132,6 +135,9 @@ export function useRecipes(
     limit?: number
     offset?: number
     favorites_only?: boolean
+    diet?: DietClass
+    meat?: MeatType
+    meal_type?: MealType
     sort?: 'title' | 'favorite'
   } = {},
 ) {

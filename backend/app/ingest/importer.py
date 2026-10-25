@@ -11,11 +11,12 @@ from recipe_scrapers import scrape_html
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.serializers import dump_tags
 from app.ingest.parsing import parse_ingredient_line
 from app.models import Recipe, RecipeIngredient
 from app.models.entities import utcnow
+from app.services.classify import classify_recipe
 from app.services.ingredients import IngredientResolver
+from app.services.tags import dump_tags
 from app.services.units import normalize_unit
 
 logger = logging.getLogger(__name__)
@@ -141,5 +142,7 @@ def upsert_recipe(
                 ingredient_id=match.ingredient.id if match.ingredient else None,
             )
         )
+    session.flush()
+    classify_recipe(recipe)
     session.flush()
     return recipe, "updated" if existing is not None else "imported"

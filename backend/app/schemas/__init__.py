@@ -5,6 +5,7 @@ from datetime import date, datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.enums import (
+    DietClass,
     ExpiryBucket,
     GrocerySource,
     GroceryStatus,
@@ -12,6 +13,7 @@ from app.models.enums import (
     IngestStatus,
     ItemStatus,
     LeftoverState,
+    MealType,
     StorageLocation,
     TransactionReason,
 )
@@ -158,6 +160,9 @@ class RecipeSummary(ORMModel):
     total_minutes: int | None
     is_favorite: bool = False
     tags: list[str] = []
+    diet: DietClass | None = None
+    meat_types: list[str] = []
+    meal_type: MealType | None = None
 
 
 class RecipeOut(RecipeSummary):

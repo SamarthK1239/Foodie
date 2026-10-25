@@ -160,6 +160,44 @@ to hand; the list can then be sorted favourites-first or filtered to favourites
 only. Starring is a dedicated endpoint rather than a `PATCH`, because an edit
 sets `is_user_edited` and would quietly opt the recipe out of future re-imports.
 
+**Diet and meal-type filters.** The recipe list can be narrowed to vegan,
+vegetarian or a specific meat (beef, pork, chicken, lamb, fish, game), and to a
+meal type (breakfast, lunch, dinner, dessert, side, drink, other). Both labels
+are **inferred and stored on the recipe**, not computed per request, so that
+filtering happens inside the SQL query — filtering in Python after the page had
+been cut to `limit` would return short pages and a `total` that only counted the
+page. Editing a recipe, or importing one, reclassifies it; existing rows are
+backfilled once at startup.
+
+Diet comes from the ingredients, because the scraped `tags` say nothing about
+meat content. The rules that matter:
+
+- **Optional ingredients are ignored.** "2 tbsp fish sauce (optional)" describes
+  a kimchi that is vegan as written for anyone who leaves it out, and treating
+  it as fish would hide the recipe from the people the flag exists for.
+- **Serving suggestions are skipped.** "toppings of your choice, such as cooked
+  bacon, chocolate chips…" is not an ingredient; without this rule it made
+  American pancakes a pork dish.
+- **"Chicken *or* vegetable stock" is not meat**, since the dish works either
+  way — so `search=chicken&diet=vegetarian` legitimately returns leek and potato
+  soup. Stock with no alternative still counts.
+- **Hidden animal products** (Worcestershire sauce, gelatine, fish sauce) make a
+  recipe non-vegetarian with no meat type, badged "Contains animal products".
+- **Vegan is a strict subset of vegetarian**, so the vegetarian filter includes
+  vegan recipes.
+- Plant look-alikes (`peanut butter`, `oat milk`) are stripped before dairy
+  matching.
+
+Meal type trusts the scraper's tags first (breakfast outranks dessert, because a
+Dutch baby is tagged both), and only tag-less recipes fall through to inference
+from the title and ingredients. Inference deliberately answers **other** rather
+than guessing. Measured against the 24 recipes in the author's library, diet and
+meat type were correct 24/24 and meal type 22/24, the two misses being side
+dishes that fell back to "other".
+
+There is no manual override: a wrong label is corrected by fixing the recipe's
+ingredients or tags, which reclassifies it.
+
 ## Planning a week
 
 **Add to this week** on a recipe page puts it on the current week's plan
@@ -292,7 +330,7 @@ the working directory is also read.
 backend/
   app/
     api/        FastAPI routers (inventory, recipes, suggestions, grocery, meal plan, analytics, scan, admin)
-    services/   Business logic: units, inventory ledger, suggestion scoring, cooking, grocery, meal plan, barcode, OCR
+    services/   Business logic: units, inventory ledger, suggestion scoring, cooking, grocery, meal plan, barcode, OCR, recipe classification
     ingest/     Polite fetcher, sitemap discovery, recipe import, resumable job runner
     models/     SQLAlchemy entities and enums
     static/     Built SPA (generated — not checked in)

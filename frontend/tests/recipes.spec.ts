@@ -92,7 +92,7 @@ test('favourites-first sorting floats starred recipes above alphabetical order',
   await page.goto('/recipes', { waitUntil: 'domcontentloaded' })
   await expect(page.locator('a p.font-medium').first()).toHaveText('Apple cake')
 
-  await page.getByRole('combobox').selectOption('favorite')
+  await page.getByLabel('Sort').selectOption('favorite')
   await expect(page.locator('a p.font-medium').first()).toHaveText('Zebra cake')
 })
 
@@ -138,4 +138,60 @@ test('the recipe detail toolbar stays on one row at desktop width', async ({ pag
   const dBox = (await deleteButton.boundingBox())!
   expect(mBox.width).toBeLessThan(120)
   expect(Math.abs(mBox.y - dBox.y)).toBeLessThan(mBox.height)
+})
+
+test('recipes can be filtered by diet and by meal type', async ({ page, request }) => {
+  // Labels are derived from the ingredients, so the fixtures are built to be
+  // unambiguous rather than asserted against a hand-set field.
+  await makeRecipe(request, 'Gooseberry beef stew', ['400 g braising beef'])
+  await makeRecipe(request, 'Damson cheese omelette', ['200 g mature cheddar', '2 eggs'])
+  await makeRecipe(request, 'Damson sorbet', ['300 g damsons', '100 g caster sugar'])
+
+  await page.goto('/recipes', { waitUntil: 'domcontentloaded' })
+  const titles = page.locator('a p.font-medium')
+  await expect(titles).toHaveCount(3)
+
+  await page.getByLabel('Diet').selectOption('diet:vegetarian')
+  // Vegan is a subset of vegetarian, so the sorbet stays visible.
+  await expect(titles).toHaveCount(2)
+  await expect(page.getByText('Gooseberry beef stew')).toHaveCount(0)
+
+  await page.getByLabel('Diet').selectOption('diet:vegan')
+  await expect(titles).toHaveCount(1)
+  await expect(titles.first()).toHaveText('Damson sorbet')
+
+  await page.getByLabel('Diet').selectOption('meat:beef')
+  await expect(titles).toHaveCount(1)
+  await expect(titles.first()).toHaveText('Gooseberry beef stew')
+
+  // Meal type narrows independently of diet.
+  await page.getByLabel('Diet').selectOption('')
+  await page.getByLabel('Meal type').selectOption('dessert')
+  await expect(titles).toHaveCount(1)
+  await expect(titles.first()).toHaveText('Damson sorbet')
+
+  await page.getByLabel('Meal type').selectOption('dinner')
+  await expect(titles).toHaveCount(1)
+  await expect(titles.first()).toHaveText('Gooseberry beef stew')
+
+  await page.getByLabel('Meal type').selectOption('breakfast')
+  await expect(titles).toHaveCount(1)
+  await expect(titles.first()).toHaveText('Damson cheese omelette')
+
+  // Diet and meal type compose rather than replace one another.
+  await page.getByLabel('Diet').selectOption('meat:beef')
+  await expect(titles).toHaveCount(0)
+  await page.getByLabel('Meal type').selectOption('dinner')
+  await expect(titles).toHaveCount(1)
+})
+
+test('a recipe card shows the diet it was classified as', async ({ page, request }) => {
+  await makeRecipe(request, 'Gooseberry beef stew', ['400 g braising beef'])
+  await makeRecipe(request, 'Damson sorbet', ['300 g damsons', '100 g caster sugar'])
+
+  await page.goto('/recipes', { waitUntil: 'domcontentloaded' })
+  const beef = page.locator('a', { hasText: 'Gooseberry beef stew' })
+  const sorbet = page.locator('a', { hasText: 'Damson sorbet' })
+  await expect(beef.getByText('Beef', { exact: true })).toBeVisible()
+  await expect(sorbet.getByText('Vegan', { exact: true })).toBeVisible()
 })

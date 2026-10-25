@@ -243,3 +243,158 @@ def test_favorites_only_search_pages_correctly(client):
 
     seen = {r["id"] for r in body["items"]} | {r["id"] for r in page_two["items"]}
     assert len(seen) == 3
+
+
+def _classified_corpus(client):
+    """A small spread of diets and meal types, labelled on create."""
+    make_recipe(
+        client,
+        "Gooseberry Steak Supper",
+        [("400 g braising beef", 400, "g", False)],
+        tags=["Dinner"],
+    )
+    make_recipe(
+        client,
+        "Damson Bacon Hash",
+        [("6 rashers smoked streaky bacon", 6, "unit", False)],
+        tags=["Breakfast"],
+    )
+    make_recipe(
+        client,
+        "Gooseberry Cheese Tart",
+        [("200 g mature cheddar", 200, "g", False), ("2 eggs", 2, "unit", False)],
+        tags=["Dessert"],
+    )
+    make_recipe(
+        client,
+        "Damson Sorbet",
+        [("300 g damsons", 300, "g", False), ("100 g caster sugar", 100, "g", False)],
+        tags=["Dessert"],
+    )
+
+
+def test_recipes_are_classified_on_create(client):
+    recipe = make_recipe(
+        client,
+        "Steak Night",
+        [("400 g bavette steak", 400, "g", False)],
+        tags=["Dinner"],
+    )
+    assert recipe["diet"] == "meat"
+    assert recipe["meat_types"] == ["beef"]
+    assert recipe["meal_type"] == "dinner"
+
+
+def test_editing_a_recipe_reclassifies_it(client):
+    recipe = make_recipe(client, "Swappable", [("400 g braising beef", 400, "g", False)])
+    assert recipe["diet"] == "meat"
+
+    updated = client.patch(
+        f"/api/recipes/{recipe['id']}",
+        json={"ingredients": [{"raw_text": "400 g red lentils", "optional": False}]},
+    )
+    assert updated.status_code == 200, updated.text
+    # Swapping the beef out must not leave the recipe filed under "beef".
+    assert updated.json()["diet"] == "vegan"
+    assert updated.json()["meat_types"] == []
+
+
+def test_filter_by_diet(client):
+    _classified_corpus(client)
+
+    meat = client.get("/api/recipes", params={"diet": "meat"}).json()
+    assert {r["title"] for r in meat["items"]} == {
+        "Gooseberry Steak Supper",
+        "Damson Bacon Hash",
+    }
+
+    vegan = client.get("/api/recipes", params={"diet": "vegan"}).json()
+    assert {r["title"] for r in vegan["items"]} == {"Damson Sorbet"}
+
+    # Vegan is a subset of vegetarian, so the sorbet shows up here too.
+    vegetarian = client.get("/api/recipes", params={"diet": "vegetarian"}).json()
+    assert {r["title"] for r in vegetarian["items"]} == {
+        "Gooseberry Cheese Tart",
+        "Damson Sorbet",
+    }
+
+
+def test_filter_by_meat_type(client):
+    _classified_corpus(client)
+
+    beef = client.get("/api/recipes", params={"meat": "beef"}).json()
+    assert {r["title"] for r in beef["items"]} == {"Gooseberry Steak Supper"}
+
+    pork = client.get("/api/recipes", params={"meat": "pork"}).json()
+    assert {r["title"] for r in pork["items"]} == {"Damson Bacon Hash"}
+
+    assert client.get("/api/recipes", params={"meat": "unicorn"}).status_code == 422
+
+
+def test_filter_by_meal_type(client):
+    _classified_corpus(client)
+
+    desserts = client.get("/api/recipes", params={"meal_type": "dessert"}).json()
+    assert {r["title"] for r in desserts["items"]} == {
+        "Gooseberry Cheese Tart",
+        "Damson Sorbet",
+    }
+
+    breakfast = client.get("/api/recipes", params={"meal_type": "breakfast"}).json()
+    assert {r["title"] for r in breakfast["items"]} == {"Damson Bacon Hash"}
+
+
+def test_filters_combine(client):
+    _classified_corpus(client)
+    combined = client.get(
+        "/api/recipes", params={"diet": "vegetarian", "meal_type": "dessert"}
+    ).json()
+    assert {r["title"] for r in combined["items"]} == {
+        "Gooseberry Cheese Tart",
+        "Damson Sorbet",
+    }
+    assert combined["total"] == 2
+
+
+def test_filters_apply_inside_the_search_query(client):
+    """The filter must narrow the search itself.
+
+    Applying it to an already-paged result would report a total that only counts
+    the current page and hand back short pages.
+    """
+    _classified_corpus(client)
+
+    everything = client.get("/api/recipes", params={"search": "damson"}).json()
+    assert everything["total"] == 2
+
+    filtered = client.get(
+        "/api/recipes", params={"search": "damson", "diet": "vegan"}
+    ).json()
+    assert filtered["total"] == 1
+    assert [r["title"] for r in filtered["items"]] == ["Damson Sorbet"]
+
+
+def test_search_filter_totals_survive_paging(client):
+    # Three recipes sharing a search token, two of them vegetarian.
+    make_recipe(client, "Quince Tart", [("200 g cheddar", 200, "g", False)])
+    make_recipe(client, "Quince Sorbet", [("100 g sugar", 100, "g", False)])
+    make_recipe(client, "Quince Beef Stew", [("400 g braising beef", 400, "g", False)])
+
+    unfiltered = client.get("/api/recipes", params={"search": "quince"}).json()
+    assert unfiltered["total"] == 3
+
+    first = client.get(
+        "/api/recipes",
+        params={"search": "quince", "diet": "vegetarian", "limit": 1},
+    ).json()
+    # One result on the page, but both vegetarian matches counted.
+    assert len(first["items"]) == 1
+    assert first["total"] == 2
+
+    second = client.get(
+        "/api/recipes",
+        params={"search": "quince", "diet": "vegetarian", "limit": 1, "offset": 1},
+    ).json()
+    assert len(second["items"]) == 1
+    assert second["total"] == 2
+    assert second["items"][0]["title"] != first["items"][0]["title"]
