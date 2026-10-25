@@ -187,6 +187,11 @@ prefills the add-item form.
   them. "Tesco British Semi Skimmed Milk" is a package of milk; storing it as a
   new ingredient would silently stop recipes matching the stock you just added.
 - Set `FOODIE_BARCODE_LOOKUP_ENABLED=false` to keep lookups entirely local.
+- Photos are downscaled before decoding and the search is time-budgeted. A
+  modern phone camera produces 12–48 megapixel stills, and decoding one at full
+  resolution both takes tens of seconds and exceeds iOS Safari's canvas limit,
+  which returns a blank image. Scanning a barcode needs far less detail than
+  that.
 
 **Expiry dates.** Photograph the printed date and Foodie reads it. A single
 confident reading is applied straight away; where the print is genuinely

@@ -10,7 +10,7 @@ import {
   PageHeader,
   Select,
 } from '../components/ui'
-import { cameraAvailable, decodeImageFile, scanFromCamera, type CameraScan } from '../lib/barcode'
+import { cameraAvailable, decodeImageFile, scanFromCamera, BlankImageError, type CameraScan } from '../lib/barcode'
 import { LOCATIONS, UNITS } from '../lib/constants'
 
 type Form = {
@@ -92,7 +92,16 @@ function CameraPane({ onCode, onClose }: { onCode: (code: string) => void; onClo
 
   return (
     <div className="mt-3 space-y-2">
-      <video ref={videoRef} className="w-full rounded-lg border border-white/10 bg-black" muted />
+      <video
+        ref={videoRef}
+        className="w-full rounded-lg border border-white/10 bg-black"
+        // iOS Safari refuses to play a video inline without playsinline and
+        // renders a black box instead. ZXing sets these imperatively too, but a
+        // React re-render can drop them.
+        playsInline
+        autoPlay
+        muted
+      />
       {error && <p className="text-sm text-rose-300">{error}</p>}
       <Button variant="ghost" onClick={onClose}>
         Stop camera
@@ -172,6 +181,7 @@ export default function Scan() {
   const [decodeError, setDecodeError] = useState<string | null>(null)
   const [added, setAdded] = useState<string | null>(null)
   const [cameraOn, setCameraOn] = useState(false)
+  const [decoding, setDecoding] = useState(false)
   const canUseCamera = cameraAvailable()
 
   const runLookup = (code: string) => {
@@ -189,12 +199,23 @@ export default function Scan() {
   const onPhoto = async (file: File | undefined) => {
     if (!file) return
     setDecodeError(null)
-    const code = await decodeImageFile(file)
-    if (!code) {
-      setDecodeError('No barcode found in that photo. Try again closer, or type the number in.')
-      return
+    setDecoding(true)
+    try {
+      const code = await decodeImageFile(file)
+      if (!code) {
+        setDecodeError('No barcode found in that photo. Try again closer, or type the number in.')
+        return
+      }
+      runLookup(code)
+    } catch (err) {
+      setDecodeError(
+        err instanceof BlankImageError
+          ? 'That photo came back blank. Try again, or type the number in.'
+          : 'Could not read that photo. Try again, or type the number in.',
+      )
+    } finally {
+      setDecoding(false)
     }
-    runLookup(code)
   }
 
   const onCameraCode = (code: string) => {
@@ -247,12 +268,13 @@ export default function Scan() {
       <Card className="mb-4">
         <div className="flex flex-wrap items-center gap-2">
           <label className="inline-flex min-h-11 cursor-pointer items-center rounded-lg bg-emerald-500 px-4 text-sm font-medium text-black hover:bg-emerald-400">
-            Take a photo
+            {decoding ? 'Reading photo…' : 'Take a photo'}
             <input
               type="file"
               accept="image/*"
               capture="environment"
               className="sr-only"
+              disabled={decoding}
               onChange={(e) => void onPhoto(e.target.files?.[0])}
             />
           </label>
